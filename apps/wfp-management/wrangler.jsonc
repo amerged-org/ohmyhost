@@ -1,0 +1,66 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-wfp-management-disabled",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-08-19",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": {
+    "WFP_ACCOUNT_ID": "00000000000000000000000000000000",
+    "WFP_DISPATCH_NAMESPACE": "disabled",
+    "DATABASE_SERVICE_US": "disabled-us",
+    "DATABASE_SERVICE_EU": "disabled-eu",
+    "NATIVE_AUTH_SERVICE_US": "disabled-us",
+    "NATIVE_AUTH_SERVICE_EU": "disabled-eu",
+    "WFP_WORKERS_DEV_SUBDOMAIN": "disabled",
+    "BUILD_OBJECTS_BUCKET_US": "disabled",
+    "BUILD_OBJECTS_BUCKET_EU": "disabled-eu",
+  },
+  // The health probe runs customer code through this binding, so it declares the egress policy
+  // Worker, and every get() passes the project's EGRESS_CONTEXT, exactly as the gateway does.
+  "dispatch_namespaces": [
+    {
+      "binding": "WFP_DISPATCH",
+      "namespace": "disabled",
+      "outbound": { "service": "ohmyho-wfp-egress-disabled", "parameters": ["EGRESS_CONTEXT"] },
+    },
+  ],
+  "r2_buckets": [
+    { "binding": "BUILD_OBJECTS_US", "bucket_name": "disabled", "jurisdiction": "us" },
+    { "binding": "BUILD_OBJECTS_EU", "bucket_name": "disabled-eu", "jurisdiction": "eu" },
+  ],
+  "services": [
+    {
+      "binding": "NATIVE_AUTH_REGISTRY_AUTHORITY",
+      "service": "ohmyho-control-store-disabled",
+      "entrypoint": "NativeAuthRegistryAuthorityRuntime",
+    },
+    {
+      "binding": "RUNTIME_SECRET_AUTHORITY",
+      "service": "ohmyho-control-store-disabled",
+      "entrypoint": "RuntimeSecretAuthorityRuntime",
+    },
+    {
+      "binding": "GATEWAY_REGISTRY",
+      "service": "ohmyho-control-api-disabled",
+      "entrypoint": "GatewayRoutingManagementService",
+    },
+    {
+      "binding": "RUNTIME_PROBES",
+      "service": "ohmyho-control-api-disabled",
+      "entrypoint": "RuntimeCreditService",
+    },
+  ],
+  // WFP_API_TOKEN is a Worker secret: the Workers for Platforms API token of this namespace.
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": true,
+      "persist": true,
+    },
+  },
+}

@@ -1,0 +1,70 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-recovery-container-production",
+  "account_id": "00000000000000000000000000000001",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-09-14",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": { "RESOURCE_NAMESPACE": "production" },
+  "durable_objects": {
+    "bindings": [{ "name": "RECOVERY_SANDBOX", "class_name": "RecoverySandbox" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RecoverySandbox"] }],
+  "containers": [
+    {
+      "name": "ohmyho-recovery-container-production",
+      "class_name": "RecoverySandbox",
+      "image": "../project-recovery-worker/container/Dockerfile",
+      "image_build_context": "../project-recovery-worker",
+      "instance_type": "standard-1",
+      "max_instances": 10,
+      "constraints": { "regions": ["ENAM", "WNAM"] },
+      "rollout_active_grace_period": 900,
+    },
+  ],
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "services": [
+    {
+      "binding": "NATIVE_RESTORE_JOB_STORE",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "NativeAuthRestoreJobRuntime",
+    },
+    {
+      "binding": "NATIVE_RESTORE_ADMIN_US",
+      "service": "ohmyho-native-auth-production-us",
+      "entrypoint": "NativeAdminService",
+    },
+    {
+      "binding": "NATIVE_RESTORE_ADMIN_EU",
+      "service": "ohmyho-native-auth-production-eu",
+      "entrypoint": "NativeAdminService",
+    },
+    {
+      "binding": "NATIVE_RESTORE_POLICY_US",
+      "service": "ohmyho-native-auth-production-us",
+      "entrypoint": "NativePolicyService",
+    },
+    {
+      "binding": "NATIVE_RESTORE_POLICY_EU",
+      "service": "ohmyho-native-auth-production-eu",
+      "entrypoint": "NativePolicyService",
+    },
+    {
+      "binding": "NATIVE_RESTORE_PREPARATION_US",
+      "service": "ohmyho-neon-management-production",
+      "entrypoint": "NativeAuthRestorePreparationService",
+    },
+    {
+      "binding": "NATIVE_RESTORE_PREPARATION_EU",
+      "service": "ohmyho-neon-management-production",
+      "entrypoint": "NativeAuthRestorePreparationService",
+    },
+    {
+      "binding": "RECOVERY_CONTROL_STORE",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "RecoveryRuntime",
+    },
+  ],
+}

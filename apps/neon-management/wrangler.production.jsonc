@@ -1,0 +1,95 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-neon-management-production",
+  "account_id": "00000000000000000000000000000001",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-08-21",
+  // Control runs on the Core (D1) through the private control-store bindings; PGCF_API_URL, PGCF_APPS_PROJECT_ID and PGCF_APPS_API_KEY stay Worker secrets.
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "secrets": { "required": ["DATABASE_WEBHOOK_SECRET_KEY_BASE64"] },
+  "triggers": { "crons": ["*/15 * * * *"] },
+  "services": [
+    {
+      "binding": "NATIVE_AUTH_RESTORE_PREPARATION_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "NativeAuthRestorePreparationRuntime",
+    },
+    {
+      "binding": "PREVIEW_NATIVE_PREPARATION_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "PreviewNativePreparationRuntime",
+    },
+    {
+      "binding": "NATIVE_AUTH_RESOURCE_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "NativeAuthResourceRuntime",
+    },
+    {
+      "binding": "NATIVE_AUTH_DELETION_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "NativeAuthDeletionRuntime",
+    },
+    {
+      "binding": "NATIVE_AUTH_REGISTRY_AUTHORITY",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "NativeAuthRegistryAuthorityRuntime",
+    },
+    {
+      "binding": "NATIVE_AUTH_REGISTRY_US",
+      "service": "ohmyho-native-auth-production-us",
+      "entrypoint": "NativeRegistryAdminService",
+    },
+    {
+      "binding": "NATIVE_AUTH_REGISTRY_EU",
+      "service": "ohmyho-native-auth-production-eu",
+      "entrypoint": "NativeRegistryAdminService",
+    },
+    {
+      "binding": "NATIVE_PREVIEW_POLICY_US",
+      "service": "ohmyho-native-auth-production-us",
+      "entrypoint": "NativeProductPreviewPolicyService",
+    },
+    {
+      "binding": "NATIVE_PREVIEW_POLICY_EU",
+      "service": "ohmyho-native-auth-production-eu",
+      "entrypoint": "NativeProductPreviewPolicyService",
+    },
+    {
+      "binding": "NATIVE_AUTH_ADMIN_US",
+      "service": "ohmyho-native-auth-production-us",
+      "entrypoint": "NativePolicyService",
+    },
+    {
+      "binding": "NATIVE_AUTH_ADMIN_EU",
+      "service": "ohmyho-native-auth-production-eu",
+      "entrypoint": "NativePolicyService",
+    },
+    {
+      "binding": "DATABASE_MANAGEMENT_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "DatabaseManagementRuntime",
+    },
+    {
+      "binding": "DATABASE_PRODUCT_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "DatabaseProductRuntime",
+    },
+    {
+      "binding": "PROJECT_DATABASE_ADMIN_US",
+      "service": "ohmyho-project-database-production-us",
+      "entrypoint": "ProjectDatabaseAdmin",
+    },
+    {
+      "binding": "PROJECT_DATABASE_ADMIN_EU",
+      "service": "ohmyho-project-database-production-eu",
+      "entrypoint": "ProjectDatabaseAdmin",
+    },
+  ],
+  "vars": {
+    "RUNTIME_CONFIGURATION_STATE": "configured",
+    "DATABASE_WEBHOOK_SECRET_KEY_VERSION": "1",
+  },
+}

@@ -1,0 +1,37 @@
+{
+  "name": "@ohmyhost/provider-github",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./errors": {
+      "source": "./src/errors.ts",
+      "types": "./dist/errors.d.ts",
+      "import": "./dist/errors.js"
+    },
+    "./webhooks": {
+      "source": "./src/webhooks.ts",
+      "types": "./dist/webhooks.d.ts",
+      "import": "./dist/webhooks.js"
+    },
+    "./internal/installation-token": {
+      "source": "./src/installation-token.ts",
+      "types": "./dist/installation-token.d.ts",
+      "import": "./dist/installation-token.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "coverage": "vitest run --root ../.. packages/provider-github/src --coverage --coverage.include='packages/provider-github/src/**/*.ts' --coverage.reporter=text --coverage.reporter=json-summary",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo",
+    "test": "vitest run --root ../.. packages/provider-github/src"
+  },
+  "dependencies": {
+    "@ohmyhost/platform": "workspace:*"
+  }
+}

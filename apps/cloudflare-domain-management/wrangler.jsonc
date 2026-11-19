@@ -1,0 +1,69 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-cloudflare-domain-management",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-08-29",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": false },
+  "vars": {
+    "RUNTIME_CONFIGURATION_STATE": "disabled",
+    "CLOUDFLARE_ACCOUNT_ID": "00000000000000000000000000000000",
+    "CLOUDFLARE_PLATFORM_ZONE_ID": "00000000000000000000000000000000",
+    "CLOUDFLARE_SAAS_ZONE_ID": "00000000000000000000000000000000",
+    "CLOUDFLARE_SAAS_CNAME_TARGET": "customers.omh.st",
+    "CLOUDFLARE_OAUTH_CLIENT_ID": "disabled-oauth-client",
+    "CLOUDFLARE_OAUTH_REDIRECT_URI": "https://dev.app.ohmyho.st/v1/cloudflare/oauth/callback",
+    "CLOUDFLARE_OAUTH_STATE_FORMAT": "json-v1",
+    "CLOUDFLARE_OAUTH_TOKEN_CIPHER_KEY_VERSION": "1",
+  },
+  // CLOUDFLARE_OAUTH_CLIENT_SECRET, CLOUDFLARE_OAUTH_TOKEN_CIPHER_KEY_BASE64,
+  // CLOUDFLARE_SAAS_API_TOKEN (Paid custom hostnames) and
+  // CLOUDFLARE_PLATFORM_WEB_DOMAIN_API_TOKEN (owned Free web zone) are Worker secrets.,
+  "services": [
+    {
+      "binding": "NATIVE_AUTH_ADMIN_US",
+      "service": "ohmyho-native-auth-disabled-us",
+      "entrypoint": "NativePolicyService",
+    },
+    {
+      "binding": "NATIVE_AUTH_ADMIN_EU",
+      "service": "ohmyho-native-auth-disabled-eu",
+      "entrypoint": "NativePolicyService",
+    },
+    {
+      "binding": "GENERAL_CF_RUNTIME",
+      "service": "ohmyho-control-store-disabled",
+      "entrypoint": "CloudflareDomainRuntime",
+    },
+    {
+      "binding": "SCOPED_DNS_RUNTIME",
+      "service": "ohmyho-control-store-disabled",
+      "entrypoint": "ScopedDnsRuntime",
+    },
+    {
+      "binding": "APPLICATION_IDENTITY_RUNTIME",
+      "service": "ohmyho-control-store-disabled",
+      "entrypoint": "ApplicationIdentityRuntime",
+    },
+    {
+      "binding": "MAIL_DNS_RUNTIME",
+      "service": "ohmyho-control-store-disabled",
+      "entrypoint": "MailDnsRuntime",
+    },
+    {
+      "binding": "RUNTIME_PROBES",
+      "service": "ohmyho-control-api-disabled",
+      "entrypoint": "RuntimeCreditService",
+    },
+    {
+      "binding": "DEV_ACCESS",
+      "service": "ohmyho-control-api-sandbox",
+      "entrypoint": "DevAccessService",
+    },
+  ],
+  // CLOUDFLARE_OAUTH_CLIENT_SECRET, CLOUDFLARE_OAUTH_TOKEN_CIPHER_KEY_BASE64,
+  // CLOUDFLARE_SAAS_API_TOKEN (Paid custom hostnames) and
+  // CLOUDFLARE_PLATFORM_WEB_DOMAIN_API_TOKEN (owned Free web zone) are Worker secrets.,
+}

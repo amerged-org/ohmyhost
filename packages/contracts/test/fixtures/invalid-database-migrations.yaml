@@ -1,0 +1,10 @@
+version: 1
+project: storefront
+build:
+  install: pnpm install --frozen-lockfile
+  command: pnpm build
+  output: dist
+runtime:
+  mode: edge
+database:
+  enabled: true

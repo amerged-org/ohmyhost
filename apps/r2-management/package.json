@@ -1,0 +1,45 @@
+{
+  "name": "@ohmyhost/r2-management",
+  "version": "0.0.0",
+  "private": true,
+  "ohmyhost": {
+    "deployment": "production",
+    "fakeProviderBoundary": {
+      "typescriptProject": "tsconfig.build.json",
+      "artifactRoot": "dist",
+      "entrypoints": [
+        "src/index.ts",
+        "src/worker-main.ts"
+      ],
+      "bundles": [
+        {
+          "entrypoint": "src/worker-main.ts",
+          "metafile": "dist/worker-bundle/metafile.json"
+        }
+      ]
+    }
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json && wrangler deploy --dry-run --outdir dist/worker-bundle --metafile dist/worker-bundle/metafile.json --config wrangler.jsonc",
+    "sandbox:preflight": "node scripts/sandbox-preflight.mjs",
+    "deploy:sandbox:dry-run": "pnpm sandbox:preflight && wrangler deploy --dry-run --outdir dist/sandbox-worker-bundle --metafile dist/sandbox-worker-bundle/metafile.json --config wrangler.sandbox.jsonc",
+    "test": "vitest run --root ../.. apps/r2-management/test",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo"
+  },
+  "dependencies": {
+    "@ohmyhost/database": "workspace:*",
+    "@ohmyhost/platform": "workspace:*",
+    "@ohmyhost/provider-cloudflare": "workspace:*"
+  },
+  "devDependencies": {
+    "wrangler": "4.125.0"
+  }
+}

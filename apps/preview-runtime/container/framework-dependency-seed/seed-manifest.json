@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "purpose": "public-dependency-graphs-only",
+  "fixtures": [
+    {
+      "fixture": "react-vite",
+      "packageManager": "pnpm@10.28.2",
+      "fixturePackageSha256": "4e78318faa39cff7b4549a021b34b9303f0687afbfbadafcb5de615ed1019e69",
+      "seedPackageSha256": "0dd00843a46c61c3609ce172917941b1ce42670f3fa7061e4daf6ae56bcfc42a",
+      "lockFile": "pnpm-lock.yaml",
+      "lockSha256": "4fb83f7d9d737d1831cc1d8d06db74dd62db1b735c18a77e24b02a4d8687db2b"
+    },
+    {
+      "fixture": "vanilla-vite",
+      "packageManager": "pnpm@10.28.2",
+      "fixturePackageSha256": "d87c9987c19e0164fd6df876db41619be34affb65f72ea1337f783910e925c06",
+      "seedPackageSha256": "85b4a4f025226f5e74a3167bb14be1a8f3fd404e3550e9e7c67b436312f0cf18",
+      "lockFile": "pnpm-lock.yaml",
+      "lockSha256": "4ac4c0c7d149ff5b6fa45f37dffef620b97c7af2ac6d089e64934baf1551998c"
+    },
+    {
+      "fixture": "tanstack-start",
+      "packageManager": "pnpm@10.28.2",
+      "fixturePackageSha256": "ff437504139af5ae08e89bde95b4e4e3d90cd6134fc8a669f3b1988715baef80",
+      "seedPackageSha256": "67f4cd31c611c81850c4edfdf0b4c906a7cafa6fc290833c99e72c768e334ad3",
+      "lockFile": "pnpm-lock.yaml",
+      "lockSha256": "74740523a979ad7292b701fb99064db2ac987331d297c0aa9368270c314169f0"
+    },
+    {
+      "fixture": "next-edge",
+      "packageManager": "pnpm@10.28.2",
+      "fixturePackageSha256": "c3ad504536cef01dfede338c5299980f460738ba8f3b8fd7a56e4e485935e88d",
+      "seedPackageSha256": "4ff1a2e88d63c421defc2c658846be0869f7b2af03d95fe1bc4f3e9956741c01",
+      "lockFile": "pnpm-lock.yaml",
+      "lockSha256": "cef0b6423bc0ca91bc9ab6112bab4de52eafbb0f40a864cbd5348def30437b84"
+    },
+    {
+      "fixture": "next-native-auth",
+      "packageManager": "pnpm@10.28.2",
+      "fixturePackageSha256": "c3ad504536cef01dfede338c5299980f460738ba8f3b8fd7a56e4e485935e88d",
+      "seedPackageSha256": "4ff1a2e88d63c421defc2c658846be0869f7b2af03d95fe1bc4f3e9956741c01",
+      "lockFile": "pnpm-lock.yaml",
+      "lockSha256": "cef0b6423bc0ca91bc9ab6112bab4de52eafbb0f40a864cbd5348def30437b84"
+    },
+    {
+      "fixture": "next-app-mail",
+      "packageManager": "pnpm@10.28.2",
+      "fixturePackageSha256": "c3ad504536cef01dfede338c5299980f460738ba8f3b8fd7a56e4e485935e88d",
+      "seedPackageSha256": "4ff1a2e88d63c421defc2c658846be0869f7b2af03d95fe1bc4f3e9956741c01",
+      "lockFile": "pnpm-lock.yaml",
+      "lockSha256": "cef0b6423bc0ca91bc9ab6112bab4de52eafbb0f40a864cbd5348def30437b84"
+    },
+    {
+      "fixture": "astro-edge",
+      "packageManager": "npm@11.5.1",
+      "fixturePackageSha256": "bab23344a94b7651961445ebd52d862c318d111745b3ded55e9e65572f25e8a1",
+      "seedPackageSha256": "81336de942291f8debb474c79ef16a6cf1cd18209431667a5edba36db45ab7c4",
+      "lockFile": "package-lock.json",
+      "lockSha256": "4b53245c2a3adcfb7bb7cd92c000a461897b74029babf9293f5534b6e892ec30"
+    }
+  ]
+}

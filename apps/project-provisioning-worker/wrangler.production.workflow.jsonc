@@ -1,0 +1,27 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-project-provisioning-workflow-production",
+  "account_id": "00000000000000000000000000000001",
+  "main": "src/workflow-main.ts",
+  "compatibility_date": "2026-08-19",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": {
+    "RUNTIME_CONFIGURATION_STATE": "configured",
+  },
+  "workflows": [
+    {
+      "name": "ohmyho-project-provisioning-v1-production",
+      "binding": "PROJECT_PROVISIONING_WORKFLOW",
+      "class_name": "ProjectProvisioningWorkflow",
+    },
+  ],
+  "services": [
+    {
+      "binding": "PROJECT_WORKFLOW_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "ProjectWorkflowRuntime",
+    },
+  ],
+}

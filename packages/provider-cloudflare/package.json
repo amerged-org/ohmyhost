@@ -1,0 +1,27 @@
+{
+  "name": "@ohmyhost/provider-cloudflare",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "coverage": "vitest run --root ../.. packages/provider-cloudflare/src --coverage --coverage.include='packages/provider-cloudflare/src/**/*.ts' --coverage.reporter=text --coverage.reporter=json-summary",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo",
+    "test": "vitest run --root ../.. packages/provider-cloudflare/src"
+  },
+  "dependencies": {
+    "@ohmyhost/contracts": "workspace:*",
+    "@ohmyhost/project-handles": "workspace:*",
+    "@ohmyhost/dev-access-tokens": "workspace:*",
+    "@aws-sdk/client-s3": "3.1114.0",
+    "@aws-sdk/s3-request-presigner": "3.1114.0",
+    "@ohmyhost/platform": "workspace:*"
+  }
+}

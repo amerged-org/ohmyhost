@@ -1,0 +1,68 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": ["tsconfig*.json"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "@ohmyhost/browser-gateway#build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/patches/pdf-lib@1.17.1.patch"],
+      "outputs": ["dist/**"]
+    },
+    "@ohmyhost/agent-skills#build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/skills/**"],
+      "outputs": ["dist/**"]
+    },
+    "@ohmyhost/control-api#build": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/scripts/prepare-portal-assets.mjs",
+        "$TURBO_ROOT$/brand/brand-bundle.json",
+        "$TURBO_ROOT$/apps/product-cli/package.json"
+      ],
+      "outputs": ["dist/**"]
+    },
+    "@ohmyhost/project-recovery#build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/postgres-tools.*"],
+      "outputs": ["dist/**"]
+    },
+    "@ohmyhost/public-site#build": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/scripts/credit-pricing-document.mjs",
+        "$TURBO_ROOT$/brand/assets/**",
+        "$TURBO_ROOT$/content/**",
+        "$TURBO_ROOT$/docs/architecture/pricing-contract.md",
+        "$TURBO_ROOT$/packages/contracts/generated/openapi.json",
+        "$TURBO_ROOT$/redocly.yaml"
+      ],
+      "outputs": ["dist/**", "public/pages/**"]
+    },
+    "lint": {
+      "dependsOn": ["^lint"],
+      "outputs": [],
+      "cache": false
+    },
+    "typecheck": {
+      "dependsOn": ["^typecheck", "^build"],
+      "outputs": [],
+      "cache": false
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "outputs": [],
+      "cache": false
+    },
+    "coverage": {
+      "dependsOn": ["^build"],
+      "outputs": ["coverage/**"],
+      "cache": false
+    }
+  }
+}

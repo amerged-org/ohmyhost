@@ -1,0 +1,109 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-deployment-workflow-production",
+  "account_id": "00000000000000000000000000000001",
+  "main": "src/deployment-workflow-main.ts",
+  "compatibility_date": "2026-08-19",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "vars": {
+    "RUNTIME_CONFIGURATION_STATE": "configured",
+  },
+  "services": [
+    {
+      "binding": "NEXT_CACHE_RETIREMENT",
+      "service": "ohmyho-next-cache-production",
+      "entrypoint": "NextCacheRetirementRuntime",
+    },
+    {
+      "binding": "NATIVE_AUTH_RESOURCE_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "NativeAuthResourceRuntime",
+    },
+    {
+      "binding": "NATIVE_AUTH_ADMIN_US",
+      "service": "ohmyho-native-auth-production-us",
+      "entrypoint": "NativePolicyService",
+    },
+    {
+      "binding": "NATIVE_AUTH_ADMIN_EU",
+      "service": "ohmyho-native-auth-production-eu",
+      "entrypoint": "NativePolicyService",
+    },
+    {
+      "binding": "DEPLOYMENT_WORKFLOW_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "DeploymentWorkflowRuntime",
+    },
+    {
+      "binding": "STORAGE_DATA_MANAGEMENT",
+      "service": "ohmyho-storage-gateway-production",
+      "entrypoint": "StorageDataManagementEntrypoint",
+    },
+    {
+      "binding": "SOURCE_FETCHER",
+      "service": "ohmyho-source-fetcher-production",
+      "entrypoint": "SourceFetcherService",
+    },
+    {
+      "binding": "BUILD_RUNNER",
+      "service": "ohmyho-build-runner-production",
+      "entrypoint": "BuildRunnerService",
+    },
+    {
+      "binding": "RECOVERY_INVOKER",
+      "service": "ohmyho-recovery-container-production",
+      "entrypoint": "RecoveryContainerService",
+    },
+    {
+      "binding": "RUNTIME_SECRET_DELIVERY",
+      "service": "ohmyho-runtime-secret-delivery-production",
+      "entrypoint": "RuntimeSecretDeliveryService",
+    },
+    {
+      "binding": "NEON_MANAGEMENT",
+      "service": "ohmyho-neon-management-production",
+      "entrypoint": "NeonManagementService",
+    },
+    {
+      "binding": "R2_MANAGEMENT",
+      "service": "ohmyho-r2-management-production",
+      "entrypoint": "R2ManagementService",
+    },
+    {
+      "binding": "SES_MANAGEMENT",
+      "service": "ohmyho-ses-management-production",
+      "entrypoint": "ResendMailManagementService",
+    },
+    {
+      "binding": "CLOUDFLARE_DOMAIN_MANAGEMENT",
+      "service": "ohmyho-cloudflare-domain-management-production",
+      "entrypoint": "CloudflareDomainManagementService",
+    },
+    {
+      "binding": "WFP_MANAGEMENT",
+      "service": "ohmyho-wfp-management-production",
+      "entrypoint": "WfpManagementService",
+    },
+  ],
+  "workflows": [
+    {
+      "name": "ohmyho-deployment-workflow-v1-production",
+      "binding": "DEPLOYMENT_WORKFLOW",
+      "class_name": "DeploymentWorkflow",
+    },
+    {
+      "name": "ohmyho-provider-reconciliation-v1-production",
+      "binding": "PROVIDER_RECONCILIATION_WORKFLOW",
+      "class_name": "ProviderReconciliationWorkflow",
+    },
+    {
+      "name": "ohmyho-project-provisioning-v1-production",
+      "binding": "PROJECT_PROVISIONING_WORKFLOW",
+      "class_name": "ProjectProvisioningWorkflow",
+      "script_name": "ohmyho-project-provisioning-workflow-production",
+    },
+  ],
+}

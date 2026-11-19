@@ -1,0 +1,10 @@
+{
+  "name": "native-auth-canary",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.2",
+  "dependencies": {
+    "@ohmyhost/customer-runtime": "file:vendor/customer-runtime.tgz"
+  }
+}

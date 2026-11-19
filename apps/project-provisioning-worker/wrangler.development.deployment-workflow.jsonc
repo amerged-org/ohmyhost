@@ -1,0 +1,124 @@
+{
+  "name": "ohmyho-deployment-workflow-poc-private-fullstack",
+  "account_id": "00000000000000000000000000000001",
+  "main": "src/deployment-workflow-main.ts",
+  "compatibility_date": "2026-08-19",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "persist": true,
+      "invocation_logs": true,
+    },
+    "traces": {
+      "enabled": false,
+      "persist": true,
+      "head_sampling_rate": 1,
+    },
+  },
+  "tail_consumers": [],
+  "vars": {
+    "RUNTIME_CONFIGURATION_STATE": "configured",
+  },
+  "services": [
+    {
+      "binding": "NEXT_CACHE_RETIREMENT",
+      "service": "ohmyho-next-cache-poc-private-fullstack",
+      "entrypoint": "NextCacheRetirementRuntime",
+    },
+    {
+      "binding": "NATIVE_AUTH_RESOURCE_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "NativeAuthResourceRuntime",
+    },
+    {
+      "binding": "NATIVE_AUTH_ADMIN_US",
+      "service": "ohmyho-native-auth-development-us",
+      "entrypoint": "NativePolicyService",
+    },
+    {
+      "binding": "NATIVE_AUTH_ADMIN_EU",
+      "service": "ohmyho-native-auth-development-eu",
+      "entrypoint": "NativePolicyService",
+    },
+    {
+      "binding": "DEPLOYMENT_WORKFLOW_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "DeploymentWorkflowRuntime",
+    },
+    {
+      "binding": "STORAGE_DATA_MANAGEMENT",
+      "service": "ohmyho-storage-gateway-poc-private-fullstack",
+      "entrypoint": "StorageDataManagementEntrypoint",
+    },
+    {
+      "binding": "BUILD_RUNNER",
+      "service": "ohmyho-build-runner-poc-private-fullstack",
+      "entrypoint": "BuildRunnerService",
+    },
+    {
+      "binding": "CLOUDFLARE_DOMAIN_MANAGEMENT",
+      "service": "ohmyho-cloudflare-domain-management-poc-private-fullstack",
+      "entrypoint": "CloudflareDomainManagementService",
+    },
+    {
+      "binding": "NEON_MANAGEMENT",
+      "service": "ohmyho-neon-management-poc-private-fullstack",
+      "entrypoint": "NeonManagementService",
+    },
+    {
+      "binding": "R2_MANAGEMENT",
+      "service": "ohmyho-r2-management-poc-private-fullstack",
+      "entrypoint": "R2ManagementService",
+    },
+    {
+      "binding": "RECOVERY_INVOKER",
+      "service": "ohmyho-recovery-container-poc-private-fullstack",
+      "entrypoint": "RecoveryContainerService",
+    },
+    {
+      "binding": "RUNTIME_SECRET_DELIVERY",
+      "service": "ohmyho-runtime-secret-delivery-poc-private-fullstack",
+      "entrypoint": "RuntimeSecretDeliveryService",
+    },
+    {
+      "binding": "SES_MANAGEMENT",
+      "service": "ohmyho-ses-management-poc-private-fullstack",
+      "entrypoint": "ResendMailManagementService",
+    },
+    {
+      "binding": "SOURCE_FETCHER",
+      "service": "ohmyho-source-fetcher-poc-private-fullstack",
+      "entrypoint": "SourceFetcherService",
+    },
+    {
+      "binding": "WFP_MANAGEMENT",
+      "service": "ohmyho-wfp-management-poc-private-fullstack",
+      "entrypoint": "WfpManagementService",
+    },
+  ],
+  "workflows": [
+    {
+      "binding": "DEPLOYMENT_WORKFLOW",
+      "name": "ohmyho-deployment-workflow-v1-poc-private-fullstack",
+      "class_name": "DeploymentWorkflow",
+    },
+    {
+      "binding": "PROJECT_PROVISIONING_WORKFLOW",
+      "name": "ohmyho-project-provisioning-v1-poc-private-fullstack",
+      "class_name": "ProjectProvisioningWorkflow",
+      "script_name": "ohmyho-project-provisioning-workflow-poc-private-fullstack",
+    },
+    {
+      "binding": "PROVIDER_RECONCILIATION_WORKFLOW",
+      "name": "ohmyho-provider-reconciliation-v1-poc-private-fullstack",
+      "class_name": "ProviderReconciliationWorkflow",
+    },
+  ],
+  "dispatch_namespaces": [],
+}

@@ -1,0 +1,43 @@
+{
+  "auth": {
+    "version": "1.7.1",
+    "provider": "better-auth",
+    "routePath": "/api/auth",
+    "deployment": "embedded",
+    "authSecretName": "BETTER_AUTH_SECRET",
+    "databaseSchema": "auth",
+    "databaseBindingName": "OHMYHOST_DATABASE"
+  },
+  "mail": {
+    "enabled": false
+  },
+  "adapter": "tanstack-start",
+  "runtime": "edge",
+  "storage": {
+    "public": false,
+    "enabled": true,
+    "provider": "r2",
+    "jurisdiction": "us"
+  },
+  "database": {
+    "enabled": true,
+    "migrations": "postgres/migrations"
+  },
+  "functions": {
+    "crons": ["*/5 * * * *", "0 3 * * *"]
+  },
+  "buildCommand": "pnpm run build",
+  "runtimePolicy": {
+    "healthCheckPath": "/",
+    "egressAllowedOrigins": ["https://generativelanguage.googleapis.com"]
+  },
+  "schemaVersion": "ohmyhost.framework-plan/v5",
+  "installCommand": "pnpm install --frozen-lockfile --ignore-scripts",
+  "applicationRoot": ".",
+  "outputDirectory": "dist/client",
+  "serverConfigPath": "dist/server/wrangler.json",
+  "serverEntryPoint": "dist/server/index.js",
+  "compatibilityDate": "2026-08-21",
+  "compatibilityFlags": ["nodejs_compat"],
+  "serverOutputDirectory": "dist/server"
+}

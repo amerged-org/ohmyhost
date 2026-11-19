@@ -1,0 +1,8 @@
+version: 1
+project: phase0-static
+build:
+  install: npm ci
+  command: npm run build
+  output: dist
+runtime:
+  mode: static

@@ -1,0 +1,46 @@
+{
+  "name": "@ohmyhost/project-recovery-worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./control-wire": {
+      "source": "./src/control-wire.ts",
+      "types": "./dist/control-wire.d.ts",
+      "import": "./dist/control-wire.js"
+    }
+  },
+  "description": "Trusted Node project recovery execution for the private Recovery Container",
+  "ohmyhost": {
+    "deployment": "production",
+    "fakeProviderBoundary": {
+      "typescriptProject": "tsconfig.build.json",
+      "artifactRoot": "dist",
+      "entrypoints": [
+        "src/job.ts",
+        "src/container-main.ts"
+      ],
+      "bundles": [
+        {
+          "entrypoint": "src/container-main.ts",
+          "metafile": "dist/container/metafile.json"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json && esbuild src/container-main.ts --bundle --platform=node --format=cjs --target=node22 --outfile=dist/container/agent.cjs --metafile=dist/container/metafile.json",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.1114.0",
+    "@aws-sdk/s3-request-presigner": "3.1114.0",
+    "@ohmyhost/platform": "workspace:*",
+    "@ohmyhost/project-recovery": "workspace:*",
+    "@ohmyhost/postgres-bridge": "workspace:*",
+    "@ohmyhost/provider-pgcf": "workspace:*"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

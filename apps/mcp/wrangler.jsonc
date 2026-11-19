@@ -1,0 +1,22 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-sandbox-mcp",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-08-23",
+  "workers_dev": true,
+  "preview_urls": false,
+  "vars": {
+    "MCP_ALLOWED_HOST": "ohmyho-sandbox-mcp.your-omh-account.workers.dev",
+    "MCP_ALLOWED_ORIGIN_HOST": "app.ohmyho.st",
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": false,
+      "persist": true,
+    },
+  },
+}

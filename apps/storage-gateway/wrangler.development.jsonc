@@ -1,0 +1,49 @@
+{
+  "name": "ohmyho-storage-gateway-poc-private-fullstack",
+  "account_id": "00000000000000000000000000000001",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-08-24",
+  "compatibility_flags": ["nodejs_compat", "enable_request_signal"],
+  // No public listener: the egress policy Worker's STORAGE_GATEWAY binding to
+  // StorageEgressEntrypoint is the platform caller; OHMYHOST_STORAGE_GATEWAY is legacy (W29).
+  "workers_dev": false,
+  "preview_urls": false,
+  "tail_consumers": [
+    {
+      "service": "ohmyho-diagnostic-tail-poc-private-fullstack",
+    },
+  ],
+  "ratelimits": [
+    {
+      "name": "GATEWAY_RATE_LIMITER",
+      "namespace_id": "2101",
+      "simple": { "limit": 1200, "period": 60 },
+    },
+    {
+      "name": "STORAGE_SCOPE_LOG_LIMITER",
+      "namespace_id": "2103",
+      "simple": { "limit": 1, "period": 60 },
+    },
+  ],
+  "vars": {
+    "CLOUDFLARE_ACCOUNT_ID": "00000000000000000000000000000001",
+    "RUNTIME_CONFIGURATION_STATE": "configured",
+  },
+  "services": [
+    {
+      "binding": "STORAGE_GATEWAY_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "StorageGatewayRuntime",
+    },
+    {
+      "binding": "STORAGE_DATA_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "StorageDataRuntime",
+    },
+  ],
+  "observability": {
+    "enabled": false,
+  },
+  // The sweep erases abandoned signed uploads a day after their claim, once an hour.
+  "triggers": { "crons": ["37 * * * *"] },
+}

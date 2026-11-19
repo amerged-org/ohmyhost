@@ -1,0 +1,99 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-native-auth-production-eu",
+  "account_id": "00000000000000000000000000000001",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-08-24",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "persist": true, "invocation_logs": false },
+    "traces": { "enabled": false },
+  },
+  "vars": {
+    "PREVIEW_HOST_SUFFIX": "preview.omh.st",
+    "NATIVE_AUTH_REGION_ID": "eu-dev",
+    "NATIVE_AUTH_CUSTODY_KEY_VERSION": 1,
+    "NATIVE_AUTH_ATOMIC_SNAPSHOT_MODE": "v1",
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "NATIVE_AUTH_ENVIRONMENTS", "class_name": "NativeAuthEnvironment" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["NativeAuthEnvironment"] }],
+  "services": [
+    {
+      "binding": "PREVIEW_CONTROL",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "PreviewTokenLookupRuntime",
+    },
+    {
+      "binding": "NATIVE_AUTH_PRODUCT_PREVIEW_AUTHORITY",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "PreviewNativeAuthAuthorityRuntime",
+    },
+    {
+      "binding": "NATIVE_AUTH_PRODUCT_PREVIEW_MAIL",
+      "service": "ohmyho-mail-gateway-production",
+      "entrypoint": "NativeProductPreviewAuthMailService",
+    },
+    {
+      "binding": "NATIVE_AUTH_AUTHORITY",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "NativeAuthRuntime",
+    },
+    {
+      "binding": "NATIVE_AUTH_PROVIDER_SECRETS",
+      "service": "ohmyho-control-api-production",
+      "entrypoint": "NativeAuthProviderSecretService",
+    },
+    {
+      "binding": "NATIVE_AUTH_ADMIN_AUTHORITY",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "NativeAuthAdminAuthorityRuntime",
+    },
+    {
+      "binding": "NATIVE_AUTH_REGISTRY_AUTHORITY",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "NativeAuthRegistryAuthorityRuntime",
+    },
+    {
+      "binding": "NATIVE_AUTH_MAIL_AUTHORITY",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "NativeAuthMailRuntime",
+    },
+    {
+      "binding": "NATIVE_AUTH_MAIL",
+      "service": "ohmyho-mail-gateway-production",
+      "entrypoint": "NativeAuthMailService",
+    },
+  ],
+  "ratelimits": [
+    {
+      "name": "NATIVE_AUTH_GENERAL_LIMITER",
+      "namespace_id": "2413",
+      "simple": { "limit": 100, "period": 60 },
+    },
+    {
+      "name": "NATIVE_AUTH_REALM_LIMITER",
+      "namespace_id": "2420",
+      "simple": { "limit": 3000, "period": 60 },
+    },
+    {
+      "name": "NATIVE_AUTH_SIGNIN_LIMITER",
+      "namespace_id": "2414",
+      "simple": { "limit": 5, "period": 60 },
+    },
+    {
+      "name": "NATIVE_AUTH_SIGNUP_LIMITER",
+      "namespace_id": "2415",
+      "simple": { "limit": 3, "period": 60 },
+    },
+    {
+      "name": "NATIVE_AUTH_RESET_LIMITER",
+      "namespace_id": "2416",
+      "simple": { "limit": 3, "period": 60 },
+    },
+  ],
+}

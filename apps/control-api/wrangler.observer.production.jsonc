@@ -1,0 +1,217 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-control-api-production",
+  "account_id": "00000000000000000000000000000001",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-08-24",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "triggers": { "crons": ["* * * * *"] },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "persist": true,
+      "invocation_logs": false,
+    },
+  },
+  "secrets": {
+    "required": ["ENVIRONMENT_SECRET_KEY_BASE64", "ENVIRONMENT_SECRET_ADDITIONAL_KEYS_JSON"],
+  },
+  "vars": {
+    "BROWSER_LOGIN_ENABLED": "true",
+    "CONTROL_API_PUBLIC_ORIGIN": "https://app.ohmyho.st",
+    "WORKOS_CONNECT_ISSUER": "https://divine-climb-22.authkit.app",
+    "WORKOS_CONNECT_JWKS_URL": "https://divine-climb-22.authkit.app/oauth2/jwks",
+    "MANAGED_ARTIFACTS_NAMESPACE_US": "ohmyhost-production-us",
+    "MANAGED_ARTIFACTS_NAMESPACE_EU": "ohmyhost-production-eu",
+    "ENVIRONMENT_SECRET_KEY_VERSION": "20261106",
+    "WORKOS_AUDIENCE": "control-api",
+    "WORKOS_CLIENT_ID": "client_00000000000000000000000018",
+    "WORKOS_ISSUER": "https://api.workos.com/user_management/client_00000000000000000000000018",
+    "WORKOS_JWKS_URL": "https://api.workos.com/sso/jwks/client_00000000000000000000000018",
+  },
+  "services": [
+    {
+      "binding": "GROWTH_ANALYTICS",
+      "service": "ohmyho-growth-analytics-production",
+      "entrypoint": "GrowthCollectRuntime",
+    },
+    {
+      "binding": "NATIVE_AUTH_PROVIDER_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "NativeAuthRuntime",
+    },
+    {
+      "binding": "NATIVE_AUTH_ADMIN_US",
+      "service": "ohmyho-native-auth-production-us",
+      "entrypoint": "NativeAdminService",
+    },
+    {
+      "binding": "NATIVE_AUTH_ADMIN_EU",
+      "service": "ohmyho-native-auth-production-eu",
+      "entrypoint": "NativeAdminService",
+    },
+    {
+      "binding": "CONTROL_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "ControlRuntime",
+    },
+    {
+      "binding": "ACCOUNT_METADATA_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "AccountMetadataRuntime",
+    },
+    {
+      "binding": "CONTROL_MAINTENANCE_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "MaintenanceRuntime",
+    },
+    {
+      "binding": "PUBLIC_ENTRY_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "PublicEntryRuntime",
+    },
+    {
+      "binding": "PUBLIC_ENTRY_RETENTION_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "PublicEntryRetentionRuntime",
+    },
+    {
+      "binding": "CUSTOMER_FEEDBACK_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "CustomerFeedbackRuntime",
+    },
+    {
+      "binding": "PUBLIC_CREDIT_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "PublicCreditRuntime",
+    },
+    {
+      "binding": "PRODUCT_API_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "ProductApiRuntime",
+    },
+    {
+      "binding": "MANAGED_SOURCE_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "ManagedSourceRuntime",
+    },
+    {
+      "binding": "DEV_ACCESS_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "DevAccessRuntime",
+    },
+    {
+      "binding": "MAIL_MANAGEMENT_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "MailManagementRuntime",
+    },
+    {
+      "binding": "SHARED_MAIL_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "SharedMailRuntime",
+    },
+    {
+      "binding": "GITHUB_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "GithubRuntime",
+    },
+    {
+      "binding": "DATABASE_PRODUCT_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "DatabaseProductRuntime",
+    },
+    {
+      "binding": "GATEWAY_LOOKUP_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "GatewayLookupRuntime",
+    },
+    {
+      "binding": "GATEWAY_MANAGEMENT_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "GatewayManagementRuntime",
+    },
+    {
+      "binding": "RUNTIME_PROBE_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "RuntimeProbeRuntime",
+    },
+    {
+      "binding": "GATEWAY_CREDIT_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "GatewayCreditRuntime",
+    },
+    {
+      "binding": "MAIL_DELIVERY",
+      "service": "ohmyho-mail-gateway-production",
+      "entrypoint": "ResendMailDeliveryService",
+    },
+    {
+      "binding": "OPERATION_PUBLISHER",
+      "service": "ohmyho-project-provisioning-publisher-production",
+      "entrypoint": "OperationPublisherService",
+    },
+    {
+      "binding": "MAIL_DOMAIN_OBSERVER",
+      "service": "ohmyho-ses-management-production",
+      "entrypoint": "ResendMailManagementService",
+    },
+    {
+      "binding": "RECOVERY_SERVICE",
+      "service": "ohmyho-recovery-container-production",
+      "entrypoint": "RecoveryContainerService",
+    },
+    { "binding": "AUTH_STATUS", "service": "ohmyhost-workos-management-production" },
+    { "binding": "BILLING", "service": "ohmyho-billing-production" },
+    { "binding": "WORKOS_WEBHOOK_INGRESS", "service": "ohmyho-webhook-ingress-production" },
+    { "binding": "GITHUB_WEBHOOK_INGRESS", "service": "ohmyho-webhook-ingress-production" },
+    {
+      "binding": "SOURCE_INSPECTOR",
+      "service": "ohmyho-source-fetcher-production",
+      "entrypoint": "SourceFetcherService",
+    },
+    {
+      "binding": "PROVIDER_RECONCILIATION",
+      "service": "ohmyho-deployment-workflow-production",
+      "entrypoint": "ProductProviderReconciliationService",
+    },
+    {
+      "binding": "CLOUDFLARE_DOMAIN_MANAGEMENT",
+      "service": "ohmyho-cloudflare-domain-management-production",
+      "entrypoint": "CloudflareDomainManagementService",
+    },
+    {
+      "binding": "NEON_MANAGEMENT",
+      "service": "ohmyho-neon-management-production",
+      "entrypoint": "NeonManagementService",
+    },
+    {
+      "binding": "CREDIT_SERVICE",
+      "service": "ohmyho-credit-service-production",
+      "entrypoint": "CreditServiceRuntime",
+    },
+  ],
+  "ratelimits": [
+    {
+      "name": "PUBLIC_ENTRY_RATE_LIMITER",
+      "namespace_id": "3002",
+      "simple": { "limit": 20, "period": 60 },
+    },
+    {
+      "name": "CONTROL_API_RATE_LIMITER",
+      "namespace_id": "3001",
+      "simple": { "limit": 1200, "period": 60 },
+    },
+  ],
+  "routes": [{ "pattern": "app.ohmyho.st", "custom_domain": true }],
+  // Retain both Prod signing keys and the independent Runtime Secret Delivery encryption key.
+  "durable_objects": {
+    "bindings": [{ "name": "GROWTH_HEALTH", "class_name": "GrowthTelemetryHealth" }],
+  },
+  "migrations": [{ "tag": "growth-health-v1", "new_sqlite_classes": ["GrowthTelemetryHealth"] }],
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
+}

@@ -1,0 +1,282 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request: {}
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  secret-scan:
+    name: Scan source for secrets
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Scan working source for secrets
+        run: |
+          docker run --rm --network none \
+            -v "$GITHUB_WORKSPACE:/repo:ro" -w /repo \
+            ghcr.io/gitleaks/gitleaks@sha256:b109bc5f8f76a38196a3e413704fc5b9e3c32360bce4e4b603bd6f45b3721dbb \
+            dir /repo --config /repo/.gitleaks.toml --redact=100 --no-banner --ignore-gitleaks-allow --max-archive-depth=2 --timeout=300
+
+  static:
+    name: Audit and check source contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository and architecture history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup-workspace
+      - name: Audit dependencies
+        run: pnpm audit:moderate
+      - name: Validate source reviews, architecture diagrams and plan links
+        run: pnpm plan:check
+      - name: Check API contracts
+        run: pnpm contracts:check
+      - name: Check generated SDK drift
+        run: pnpm sdk-ts:check
+      - name: Check formatting
+        run: pnpm format:check
+      - name: Lint
+        run: pnpm lint
+
+  build:
+    name: Build workspace and inventory tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - id: setup
+        uses: ./.github/actions/setup-workspace
+      - name: Build every workspace package
+        run: pnpm build
+        env:
+          # Lists the task hashes this build used, so the saved cache keeps only those entries.
+          TURBO_RUN_SUMMARY: "true"
+      # Turbo replays only dist/** and public/pages/**, but four generators rewrite five tracked
+      # files during the build (the portal assets, the public-site pricing, site frame and content,
+      # the skill resources). An entry saved by a build that left one of them changed would be
+      # replayed by a later commit with the same declared inputs without that rewrite, and the
+      # shards' source-identity comparison would pass on the stale file. So a dirty build fails here,
+      # before anything is saved.
+      - name: Require the build to leave every tracked file as committed
+        run: |
+          git status --porcelain=v1 --untracked-files=all
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+      # The only job that saves compiled task outputs. Every other job restores this commit's entry
+      # or, when it ran before the save, the newest entry of an earlier commit. A failed build saves
+      # nothing; a restored exact entry is immutable and is not saved again.
+      - name: Keep only the entries this build used
+        if: ${{ steps.setup.outputs.turbo-cache-hit != 'true' }}
+        run: node scripts/prune-turbo-cache.mjs
+      - name: Save compiled task outputs
+        if: ${{ steps.setup.outputs.turbo-cache-hit != 'true' }}
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .turbo/cache
+          key: ${{ steps.setup.outputs.turbo-cache-key }}
+      - name: Record the complete test inventory
+        run: node scripts/vitest-shards.mjs inventory --output .ohmyhost/test-shards/inventory.json --shards 6 --timings scripts/ci-test-durations.json
+      - name: Publish the exact test inventory
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: vitest-inventory
+          path: .ohmyhost/test-shards/inventory.json
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: true
+          include-hidden-files: true
+
+  boundaries:
+    name: Typecheck and verify production boundaries
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-workspace
+        with:
+          postgres: "true"
+          opentofu: "true"
+      - name: Restore the verified package graph
+        run: pnpm build
+      # tsc compares every file's content hash with the restored build information and rechecks
+      # what changed, so the typecheck itself always runs. It keeps a cached result across a change
+      # of target or module, so the key hashes every tsconfig and a changed one starts cold.
+      # Only a green typecheck saves.
+      - name: Read the compiler versions that scope the build-information key
+        id: compiler
+        run: |
+          node_version=$(node --version)
+          typescript_version=$(node -p "require('typescript/package.json').version")
+          echo "versions=node${node_version#v}-ts${typescript_version}" >> "$GITHUB_OUTPUT"
+      - name: Restore the TypeScript build information
+        id: tsc
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            apps/*/typecheck.tsbuildinfo
+            packages/*/typecheck.tsbuildinfo
+          key: tsc-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.compiler.outputs.versions }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig*.json', 'apps/*/tsconfig*.json', 'packages/*/tsconfig*.json') }}-${{ github.sha }}
+          restore-keys: |
+            tsc-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.compiler.outputs.versions }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig*.json', 'apps/*/tsconfig*.json', 'packages/*/tsconfig*.json') }}-
+      - name: Typecheck the workspace
+        env:
+        run: pnpm typecheck
+      - name: Save the TypeScript build information
+        if: ${{ steps.tsc.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            apps/*/typecheck.tsbuildinfo
+            packages/*/typecheck.tsbuildinfo
+          key: ${{ steps.tsc.outputs.cache-primary-key }}
+      - name: Test the Product CLI boundary
+        run: pnpm phase1:product-cli-boundary:test
+      - name: Verify the Product CLI boundary
+        run: pnpm phase1:product-cli-boundary
+      - name: Verify webhook ingress isolation
+        run: pnpm phase1:webhook-ingress-boundary
+      - name: Verify application root handling
+        run: pnpm proof:application-root:test
+      - name: Verify PostgreSQL portability
+        run: pnpm proof:postgres-portability:test
+      - name: Reject test providers in production bundles
+        run: pnpm phase0:fake-provider-boundary:verify
+
+  node-tests:
+    name: Verify Node and packaged-client tests
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository and historical test evidence
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup-workspace
+        with:
+          postgres: "true"
+          opentofu: "true"
+      - name: Restore the verified package graph
+        run: pnpm build
+      - name: Install the pinned Next runtime fixture
+        run: pnpm --dir fixtures/next-edge --ignore-workspace install --frozen-lockfile --ignore-scripts
+      - name: Run every Node test suite
+        run: pnpm test:node
+
+  vitest:
+    name: Vitest shard ${{ matrix.shard }}/6
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-workspace
+        with:
+          postgres: "true"
+          opentofu: "true"
+      - name: Restore the verified package graph
+        run: pnpm build
+      - name: Read the exact test inventory
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: vitest-inventory
+          path: .ohmyhost/test-shards
+      - name: Run the assigned tests with coverage
+        run: node scripts/vitest-shards.mjs run --inventory .ohmyhost/test-shards/inventory.json --shard ${{ matrix.shard }} --output .ohmyhost/test-shards/shard-${{ matrix.shard }}
+      - name: Preserve this shard's evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          # Names are scoped to this run; failed-job reruns can reuse its successful shards.
+          name: shard-${{ matrix.shard }}
+          path: |
+            .ohmyhost/test-shards/shard-${{ matrix.shard }}/blob.json
+            .ohmyhost/test-shards/shard-${{ matrix.shard }}/evidence.json
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: true
+          include-hidden-files: true
+
+  coverage:
+    name: Merge complete reports and enforce coverage
+    needs: [build, vitest]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-workspace
+      - name: Restore the verified package graph
+        run: pnpm build
+      - name: Read the exact test inventory
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: vitest-inventory
+          path: .ohmyhost/test-shards
+      - name: Read every shard report
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: shard-*
+          path: .ohmyhost/test-shards
+      - name: Enforce complete tests and 100 percent function coverage
+        run: node scripts/vitest-shards.mjs merge --inventory .ohmyhost/test-shards/inventory.json --input .ohmyhost/test-shards --output .ohmyhost/test-shards/merged
+      - name: Preserve the combined report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: coverage-merged
+          path: |
+            .ohmyhost/test-shards/merged/summary.json
+            .ohmyhost/test-shards/merged/coverage/coverage-summary.json
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: true
+          include-hidden-files: true
+
+  verify:
+    name: Verify complete release gate
+    if: ${{ always() }}
+    needs: [secret-scan, static, build, boundaries, node-tests, vitest, coverage]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24.6.0
+      - name: Require every job to have succeeded
+        env:
+          CI_JOB_RESULTS: ${{ toJSON(needs) }}
+        run: node scripts/check-ci-jobs.mjs

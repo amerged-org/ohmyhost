@@ -1,0 +1,66 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-gateway-production",
+  "account_id": "00000000000000000000000000000001",
+  "main": "src/shared-gateway-main.ts",
+  "compatibility_date": "2026-08-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": { "DEV_AUTH_ATOMIC_MODE": "v1", "PREVIEW_HOST_SUFFIX": "preview.omh.st" },
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": false, "invocation_logs": false },
+    "traces": { "enabled": false },
+  },
+  "logpush": false,
+  "tail_consumers": [{ "service": "ohmyho-diagnostic-tail-production" }],
+  "dispatch_namespaces": [
+    {
+      "binding": "DISPATCHER",
+      "namespace": "ohmyho-production",
+      "outbound": {
+        "service": "ohmyho-wfp-egress-production",
+        "parameters": ["EGRESS_CONTEXT"],
+      },
+    },
+  ],
+  "services": [
+    {
+      "binding": "PREVIEW_RUNTIME",
+      "service": "ohmyho-live-preview-production",
+    },
+    {
+      "binding": "NATIVE_AUTH_US",
+      "service": "ohmyho-native-auth-production-us",
+      "entrypoint": "NativePublicService",
+    },
+    {
+      "binding": "NATIVE_AUTH_EU",
+      "service": "ohmyho-native-auth-production-eu",
+      "entrypoint": "NativePublicService",
+    },
+    {
+      "binding": "GATEWAY_ROUTING",
+      "service": "ohmyho-control-api-production",
+      "entrypoint": "GatewayRoutingService",
+    },
+    {
+      "binding": "DEV_ACCESS",
+      "service": "ohmyho-control-api-production",
+      "entrypoint": "DevAccessService",
+    },
+    {
+      "binding": "CREDIT_ADMISSION",
+      "service": "ohmyho-control-api-production",
+      "entrypoint": "RuntimeCreditService",
+    },
+  ],
+  "ratelimits": [
+    {
+      "name": "DIAGNOSTIC_LIMITER",
+      "namespace_id": "2418",
+      "simple": { "limit": 6, "period": 60 },
+    },
+  ],
+}

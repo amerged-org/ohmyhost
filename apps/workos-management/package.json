@@ -1,0 +1,50 @@
+{
+  "name": "@ohmyhost/workos-management",
+  "version": "0.0.0",
+  "private": true,
+  "ohmyhost": {
+    "deployment": "production",
+    "fakeProviderBoundary": {
+      "typescriptProject": "tsconfig.build.json",
+      "artifactRoot": "dist",
+      "entrypoints": [
+        "src/index.ts",
+        "src/sandbox-main.ts",
+        "src/worker-main.ts"
+      ],
+      "bundles": [
+        {
+          "entrypoint": "src/sandbox-main.ts",
+          "metafile": "dist/sandbox-main-metafile.json"
+        },
+        {
+          "entrypoint": "src/worker-main.ts",
+          "metafile": "dist/worker-bundle/metafile.json"
+        }
+      ]
+    }
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json && esbuild src/sandbox-main.ts --bundle --platform=node --format=esm --target=node24 --outfile=dist/sandbox-main.js --sourcemap --metafile=dist/sandbox-main-metafile.json && node scripts/prepare-worker-bundle.mjs && wrangler deploy --dry-run --outdir dist/worker-bundle --metafile dist/worker-bundle/metafile.json --config wrangler.jsonc && node scripts/finalize-worker-bundle.mjs && node scripts/verify-built-boundary.mjs && node scripts/emit-artifact-proof.mjs",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo",
+    "test": "vitest run --root ../.. apps/workos-management",
+    "coverage": "vitest run --root ../.. --coverage --coverage.include=apps/workos-management/src/**/*.ts apps/workos-management"
+  },
+  "dependencies": {
+    "@ohmyhost/platform": "workspace:*",
+    "@ohmyhost/workos-auth-contracts": "workspace:*",
+    "@ohmyhost/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "wrangler": "4.124.0"
+  }
+}

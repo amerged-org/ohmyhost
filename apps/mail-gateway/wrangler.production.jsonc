@@ -1,0 +1,68 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-mail-gateway-production",
+  "account_id": "00000000000000000000000000000001",
+  "main": "src/resend-worker.ts",
+  "compatibility_date": "2026-08-22",
+  "compatibility_flags": ["nodejs_compat", "enable_request_signal"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "services": [
+    {
+      "binding": "PROJECT_PREVIEW_AUTHORITY",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "PreviewTokenLookupRuntime",
+    },
+    {
+      "binding": "NATIVE_AUTH_MAIL_AUTHORITY",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "NativeAuthMailRuntime",
+    },
+    {
+      "binding": "MAIL_SEND_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "MailSendRuntime",
+    },
+    {
+      "binding": "MAIL_INFRASTRUCTURE_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "MailInfrastructureRuntime",
+    },
+    {
+      "binding": "MAIL_DELIVERY_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "MailDeliveryRuntime",
+    },
+    {
+      "binding": "MAIL_WARNING_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "MailWarningRuntime",
+    },
+    {
+      "binding": "MAIL_CAPABILITY_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "MailCapabilityRuntime",
+    },
+    {
+      "binding": "CREDIT_WARNING_RECIPIENTS",
+      "service": "ohmyhost-workos-management-production",
+      "entrypoint": "CreditWarningRecipientsService",
+    },
+    {
+      "binding": "SIGNUP_FEEDBACK_STORE",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "SignupFeedbackRuntime",
+    },
+    {
+      "binding": "SIGNUP_FEEDBACK_RECIPIENTS",
+      "service": "ohmyhost-workos-management-production",
+      "entrypoint": "SignupFeedbackRecipientsService",
+    },
+  ],
+  "triggers": { "crons": ["* * * * *"] },
+  "vars": {
+    "RUNTIME_CONFIGURATION_STATE": "configured",
+    "PLATFORM_ENVIRONMENT": "production",
+  },
+}

@@ -1,0 +1,101 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-growth-analytics-production",
+  "account_id": "00000000000000000000000000000001",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-11-15",
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": {
+    "GROWTH_PLATFORM_ENV": "production",
+    "GROWTH_PUBLIC_ORIGIN": "https://growth.example.test",
+    "GROWTH_ACCESS_ISSUER": "https://odd-cake-1086.cloudflareaccess.com",
+    "GROWTH_ACCESS_AUDIENCE": "0000000000000000000000000000000000000000000000000000000000000016",
+    "GROWTH_QUEUE_NAME": "ohmyho-growth-production",
+    "GROWTH_DLQ_NAME": "ohmyho-growth-production-dlq",
+  },
+  "secrets": {
+    "required": ["GROWTH_OPERATOR_PERMISSIONS_JSON"],
+  },
+  "d1_databases": [
+    {
+      "binding": "GROWTH_DB",
+      "database_name": "ohmyho-growth-production",
+      "database_id": "00000000-0000-4000-8000-000000000017",
+      "migrations_dir": "migrations",
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "GROWTH_USAGE_ARCHIVE",
+      "bucket_name": "ohmyho-growth-production-usage",
+      "jurisdiction": "eu",
+    },
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "GROWTH_QUEUE",
+        "queue": "ohmyho-growth-production",
+      },
+    ],
+    "consumers": [
+      {
+        "queue": "ohmyho-growth-production",
+        "max_batch_size": 20,
+        "max_batch_timeout": 1,
+        "max_retries": 3,
+        "max_concurrency": 3,
+        "dead_letter_queue": "ohmyho-growth-production-dlq",
+      },
+      {
+        "queue": "ohmyho-growth-production-dlq",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 3,
+        "max_concurrency": 1,
+      },
+    ],
+  },
+  "services": [
+    {
+      "binding": "GROWTH_FACTS",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "GrowthFactsRuntime",
+    },
+    {
+      "binding": "GROWTH_IDENTITY",
+      "service": "ohmyhost-workos-management-production",
+      "entrypoint": "GrowthIdentityService",
+    },
+    {
+      "binding": "GROWTH_PAYMENTS",
+      "service": "ohmyho-billing-production",
+      "entrypoint": "GrowthPaymentService",
+    },
+    {
+      "binding": "GROWTH_RECONCILER",
+      "service": "ohmyho-growth-analytics-production",
+      "entrypoint": "GrowthReconcileRuntime",
+    },
+  ],
+  "routes": [
+    {
+      "pattern": "growth.example.test",
+      "custom_domain": true,
+    },
+  ],
+  "triggers": {
+    "crons": ["*/5 * * * *"],
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+  },
+  "version_metadata": {
+    "binding": "CF_VERSION_METADATA",
+  },
+  "limits": {
+    "cpu_ms": 30000,
+  },
+}

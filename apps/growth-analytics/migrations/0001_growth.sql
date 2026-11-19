@@ -1,0 +1,27 @@
+CREATE TABLE growth_events (event_id TEXT PRIMARY KEY, account_id TEXT, flow_id TEXT, organization_id TEXT, event_name TEXT NOT NULL, occurred_at TEXT NOT NULL, received_at TEXT NOT NULL, body TEXT NOT NULL);
+CREATE INDEX growth_events_account ON growth_events(account_id);
+CREATE TABLE growth_facts (fact_id TEXT PRIMARY KEY, account_id TEXT, organization_id TEXT, occurred_at TEXT, body TEXT NOT NULL);
+CREATE INDEX growth_facts_account ON growth_facts(account_id);
+CREATE TABLE growth_milestones (event_id TEXT PRIMARY KEY, account_id TEXT, organization_id TEXT, event_name TEXT NOT NULL, occurred_at TEXT NOT NULL);
+CREATE TABLE growth_activity (event_id TEXT PRIMARY KEY, account_id TEXT, organization_id TEXT, occurred_at TEXT NOT NULL);
+CREATE TABLE growth_cursors (source TEXT PRIMARY KEY, cursor TEXT, source_watermark TEXT, history_floor TEXT, error_class TEXT);
+CREATE TABLE growth_replay_suppression (record_type TEXT NOT NULL, record_id TEXT NOT NULL, expires_at TEXT NOT NULL, PRIMARY KEY(record_type,record_id));
+CREATE TABLE growth_subject_suppression (subject_key TEXT PRIMARY KEY, deleted_at TEXT NOT NULL);
+CREATE TABLE growth_campaigns (campaign_key TEXT PRIMARY KEY, body TEXT NOT NULL, expires_at TEXT NOT NULL);
+CREATE TABLE growth_subjects (account_id TEXT PRIMARY KEY, segment TEXT NOT NULL DEFAULT 'unknown');
+CREATE TABLE growth_experiments (experiment_id TEXT PRIMARY KEY, body TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE TABLE growth_exposures (experiment_id TEXT NOT NULL, subject_id TEXT NOT NULL, variant TEXT NOT NULL, version TEXT NOT NULL, delivered_at TEXT NOT NULL, PRIMARY KEY(experiment_id,subject_id,variant,version));
+
+CREATE TABLE growth_flows (flow_id TEXT PRIMARY KEY, account_id TEXT NOT NULL, linked_at TEXT NOT NULL, expires_at TEXT NOT NULL);
+CREATE TABLE growth_membership_snapshots (source_id TEXT PRIMARY KEY, account_id TEXT NOT NULL, organization_id TEXT NOT NULL, active INTEGER NOT NULL, observed_at TEXT NOT NULL, source_version TEXT NOT NULL, source_revision INTEGER NOT NULL);
+CREATE TABLE growth_ingest_budgets (producer TEXT NOT NULL, minute TEXT NOT NULL, accepted INTEGER NOT NULL, PRIMARY KEY(producer,minute));
+CREATE TABLE growth_ingest_health (producer TEXT NOT NULL, outcome TEXT NOT NULL, count INTEGER NOT NULL, PRIMARY KEY(producer,outcome));
+CREATE TABLE growth_identity_audit (operator_id TEXT NOT NULL, subject_id TEXT NOT NULL, accessed_at TEXT NOT NULL);
+CREATE TABLE growth_flow_suppression (flow_id TEXT PRIMARY KEY, expires_at TEXT NOT NULL);
+CREATE TABLE growth_diagnostic_slots (account_id TEXT NOT NULL, event_name TEXT NOT NULL, minute TEXT NOT NULL, PRIMARY KEY(account_id,event_name,minute));
+CREATE TABLE growth_dispute_scans (singleton INTEGER PRIMARY KEY CHECK(singleton=1), generation TEXT NOT NULL, started_at TEXT NOT NULL);
+CREATE TABLE growth_dispute_staging (generation TEXT NOT NULL, fact_id TEXT NOT NULL, body TEXT NOT NULL, PRIMARY KEY(generation,fact_id));
+CREATE TABLE growth_open_disputes (fact_id TEXT PRIMARY KEY, body TEXT NOT NULL);
+CREATE TABLE growth_campaign_expiry (campaign_key TEXT PRIMARY KEY, first_observed_at TEXT NOT NULL, expires_at TEXT NOT NULL);
+CREATE TABLE growth_segment_tags (entity_type TEXT NOT NULL CHECK(entity_type IN ('account','organization')), entity_id TEXT NOT NULL, segment TEXT NOT NULL CHECK(segment IN ('test','non_test','unknown')), updated_at TEXT NOT NULL, PRIMARY KEY(entity_type,entity_id));
+CREATE TABLE growth_segment_audit (operator_id TEXT NOT NULL, entity_type TEXT NOT NULL, subject_digest TEXT NOT NULL, segment TEXT NOT NULL, changed_at TEXT NOT NULL);

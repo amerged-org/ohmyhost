@@ -1,0 +1,49 @@
+{
+  "name": "@ohmyhost/source-fetcher",
+  "version": "0.0.0",
+  "private": true,
+  "ohmyhost": {
+    "deployment": "production",
+    "fakeProviderBoundary": {
+      "typescriptProject": "tsconfig.build.json",
+      "artifactRoot": "dist",
+      "entrypoints": [
+        "src/index.ts",
+        "src/worker-main.ts"
+      ],
+      "bundles": []
+    }
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "coverage": "vitest run --root ../.. apps/source-fetcher/test --coverage --coverage.include='apps/source-fetcher/src/**/*.ts' --coverage.reporter=text --coverage.reporter=json-summary",
+    "deploy:dry-run": "wrangler deploy --dry-run --outdir .wrangler/dry-run",
+    "deploy:sandbox:dry-run": "wrangler deploy --dry-run --config wrangler.sandbox.jsonc --outdir .wrangler/sandbox-dry-run",
+    "deploy:sandbox:preflight": "pnpm build && node scripts/sandbox-preflight.mjs",
+    "managed-git:preflight": "pnpm build && node scripts/managed-git-preflight.mjs",
+    "test": "vitest run --root ../.. apps/source-fetcher/test",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo"
+  },
+  "dependencies": {
+    "@ohmyhost/adapter-astro": "workspace:*",
+    "@ohmyhost/adapter-functions": "workspace:*",
+    "@ohmyhost/adapter-next": "workspace:*",
+    "@ohmyhost/adapter-tanstack": "workspace:*",
+    "@ohmyhost/adapter-vite": "workspace:*",
+    "@ohmyhost/contracts": "workspace:*",
+    "@ohmyhost/platform": "workspace:*",
+    "@ohmyhost/provider-github": "workspace:*",
+    "isomorphic-git": "1.43.0"
+  },
+  "devDependencies": {
+    "wrangler": "4.145.0"
+  }
+}

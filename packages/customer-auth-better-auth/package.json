@@ -1,0 +1,43 @@
+{
+  "name": "@ohmyhost/customer-auth-better-auth",
+  "version": "0.1.70",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./next": {
+      "source": "./src/next.ts",
+      "types": "./dist/next.d.ts",
+      "import": "./dist/next.js"
+    },
+    "./tanstack": {
+      "source": "./src/tanstack.ts",
+      "types": "./dist/tanstack.d.ts",
+      "import": "./dist/tanstack.js"
+    },
+    "./vite-companion": {
+      "source": "./src/vite-companion.ts",
+      "types": "./dist/vite-companion.d.ts",
+      "import": "./dist/vite-companion.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "test": "vitest run --root ../.. packages/customer-auth-better-auth/src",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo"
+  },
+  "dependencies": {
+    "@cloudflare/workers-types": "5.20260906.1",
+    "@types/pg": "8.15.5",
+    "better-auth": "1.7.7",
+    "bun-types": "1.4.1",
+    "pg": "8.22.0"
+  },
+  "devDependencies": {
+    "@ohmyhost/platform": "workspace:*"
+  }
+}

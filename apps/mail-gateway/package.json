@@ -1,0 +1,46 @@
+{
+  "name": "@ohmyhost/mail-gateway",
+  "version": "0.0.0",
+  "private": true,
+  "ohmyhost": {
+    "deployment": "production",
+    "fakeProviderBoundary": {
+      "typescriptProject": "tsconfig.build.json",
+      "artifactRoot": "dist",
+      "entrypoints": [
+        "src/index.ts",
+        "src/resend-worker.ts"
+      ],
+      "bundles": [
+        {
+          "entrypoint": "src/resend-worker.ts",
+          "metafile": "dist/worker-bundle/metafile.json"
+        }
+      ]
+    }
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json && wrangler deploy --dry-run --outdir dist/worker-bundle --metafile dist/worker-bundle/metafile.json --config wrangler.jsonc",
+    "deploy:sandbox:dry-run": "wrangler deploy --dry-run --outdir dist/sandbox-worker-bundle --metafile dist/sandbox-worker-bundle/metafile.json --config wrangler.sandbox.jsonc",
+    "test": "vitest run --root ../.. apps/mail-gateway/test",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo"
+  },
+  "dependencies": {
+    "@ohmyhost/contracts": "workspace:*",
+    "@ohmyhost/database": "workspace:*",
+    "@ohmyhost/platform": "workspace:*",
+    "@ohmyhost/provider-resend": "workspace:*",
+    "zod": "4.6.6"
+  },
+  "devDependencies": {
+    "wrangler": "4.124.0"
+  }
+}

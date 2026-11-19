@@ -1,0 +1,6 @@
+**
+!container/
+!container/Dockerfile
+!dist/
+!dist/container/
+!dist/container/agent.cjs

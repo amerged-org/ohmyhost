@@ -1,0 +1,16 @@
+version: 1
+project: storefront
+build:
+  install: pnpm install --frozen-lockfile
+  command: pnpm build
+  output: dist
+runtime:
+  mode: auto
+  healthcheck: /api/health
+database:
+  enabled: true
+  migrations: ./db/migrations
+auth:
+  provider: better-auth
+mail:
+  enabled: true

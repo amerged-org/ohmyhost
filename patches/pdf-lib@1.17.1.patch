@@ -1,0 +1,114 @@
+diff --git a/cjs/core/parser/BaseParser.js b/cjs/core/parser/BaseParser.js
+index 1e5b078fa9d6fad42682247cbfffcea72b49cd34..9bcfe525b310acd431fb8cef5bdef493abd52f61 100644
+--- a/cjs/core/parser/BaseParser.js
++++ b/cjs/core/parser/BaseParser.js
+@@ -55,12 +55,12 @@ var BaseParser = /** @class */ (function () {
+         if (numberValue > Number.MAX_SAFE_INTEGER) {
+             if (this.capNumbers) {
+                 var msg = "Parsed number that is too large for some PDF readers: " + value + ", using Number.MAX_SAFE_INTEGER instead.";
+-                console.warn(msg);
++                /* Do not log parsed customer PDF data. */
+                 return Number.MAX_SAFE_INTEGER;
+             }
+             else {
+                 var msg = "Parsed number that is too large for some PDF readers: " + value + ", not capping.";
+-                console.warn(msg);
++                /* Do not log parsed customer PDF data. */
+             }
+         }
+         return numberValue;
+diff --git a/cjs/core/parser/PDFParser.js b/cjs/core/parser/PDFParser.js
+index 46f01e42a9232a7462cebed752ef8ae647d141f8..db0dd4ee2e65d6a0eb3cbcaffa1f5eaa4b5565d2 100644
+--- a/cjs/core/parser/PDFParser.js
++++ b/cjs/core/parser/PDFParser.js
+@@ -62,7 +62,7 @@ var PDFParser = /** @class */ (function (_super) {
+                     case 3:
+                         this.maybeRecoverRoot();
+                         if (this.context.lookup(PDFRef_1.default.of(0))) {
+-                            console.warn('Removing parsed object: 0 0 R');
++                            /* Do not log parser diagnostics. */
+                             this.context.delete(PDFRef_1.default.of(0));
+                         }
+                         return [2 /*return*/, this.context];
+@@ -163,9 +163,9 @@ var PDFParser = /** @class */ (function (_super) {
+         var msg = "Trying to parse invalid object: " + JSON.stringify(startPos) + ")";
+         if (this.throwOnInvalidObject)
+             throw new Error(msg);
+-        console.warn(msg);
++        /* Do not log parsed customer PDF data. */
+         var ref = this.parseIndirectObjectHeader();
+-        console.warn("Invalid object ref: " + ref);
++        /* Do not log parsed customer PDF data. */
+         this.skipWhitespaceAndComments();
+         var start = this.bytes.offset();
+         var failed = true;
+diff --git a/cjs/core/streams/FlateStream.js b/cjs/core/streams/FlateStream.js
+index 1625eadf6aeb0edb336fd70c2a9be90d7233cda3..acfd96991531965861500c7b12a74791dbb0bd4a 100644
+--- a/cjs/core/streams/FlateStream.js
++++ b/cjs/core/streams/FlateStream.js
+@@ -321,7 +321,7 @@ var FlateStream = /** @class */ (function (_super) {
+         }
+         var code = codes[codeBuf & ((1 << maxLen) - 1)];
+         if (typeof codes === 'number') {
+-            console.log('FLATE:', code);
++            /* Do not log parsed customer PDF data. */
+         }
+         var codeLen = code >> 16;
+         var codeVal = code & 0xffff;
+diff --git a/es/core/parser/BaseParser.js b/es/core/parser/BaseParser.js
+index ed967565de75cf5b3957a62e7b80f679fad6e567..a4047300dab05881daa61b88220f3ff24039f02a 100644
+--- a/es/core/parser/BaseParser.js
++++ b/es/core/parser/BaseParser.js
+@@ -52,12 +52,12 @@ var BaseParser = /** @class */ (function () {
+         if (numberValue > Number.MAX_SAFE_INTEGER) {
+             if (this.capNumbers) {
+                 var msg = "Parsed number that is too large for some PDF readers: " + value + ", using Number.MAX_SAFE_INTEGER instead.";
+-                console.warn(msg);
++                /* Do not log parsed customer PDF data. */
+                 return Number.MAX_SAFE_INTEGER;
+             }
+             else {
+                 var msg = "Parsed number that is too large for some PDF readers: " + value + ", not capping.";
+-                console.warn(msg);
++                /* Do not log parsed customer PDF data. */
+             }
+         }
+         return numberValue;
+diff --git a/es/core/parser/PDFParser.js b/es/core/parser/PDFParser.js
+index b5d25a1be91dddd55ab7562bf40cbc383148436f..54c0afc67036a53d4b48f25553da3cce90002749 100644
+--- a/es/core/parser/PDFParser.js
++++ b/es/core/parser/PDFParser.js
+@@ -60,7 +60,7 @@ var PDFParser = /** @class */ (function (_super) {
+                     case 3:
+                         this.maybeRecoverRoot();
+                         if (this.context.lookup(PDFRef.of(0))) {
+-                            console.warn('Removing parsed object: 0 0 R');
++                            /* Do not log parser diagnostics. */
+                             this.context.delete(PDFRef.of(0));
+                         }
+                         return [2 /*return*/, this.context];
+@@ -161,9 +161,9 @@ var PDFParser = /** @class */ (function (_super) {
+         var msg = "Trying to parse invalid object: " + JSON.stringify(startPos) + ")";
+         if (this.throwOnInvalidObject)
+             throw new Error(msg);
+-        console.warn(msg);
++        /* Do not log parsed customer PDF data. */
+         var ref = this.parseIndirectObjectHeader();
+-        console.warn("Invalid object ref: " + ref);
++        /* Do not log parsed customer PDF data. */
+         this.skipWhitespaceAndComments();
+         var start = this.bytes.offset();
+         var failed = true;
+diff --git a/es/core/streams/FlateStream.js b/es/core/streams/FlateStream.js
+index 600b4e5f97f6269d56cd6093e9e36df518e71909..626a69eb7a5d6457375860364488a54b028aaa74 100644
+--- a/es/core/streams/FlateStream.js
++++ b/es/core/streams/FlateStream.js
+@@ -319,7 +319,7 @@ var FlateStream = /** @class */ (function (_super) {
+         }
+         var code = codes[codeBuf & ((1 << maxLen) - 1)];
+         if (typeof codes === 'number') {
+-            console.log('FLATE:', code);
++            /* Do not log parsed customer PDF data. */
+         }
+         var codeLen = code >> 16;
+         var codeVal = code & 0xffff;

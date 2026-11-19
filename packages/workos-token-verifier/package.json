@@ -1,0 +1,26 @@
+{
+  "name": "@ohmyhost/workos-token-verifier",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./errors": {
+      "source": "./src/errors.ts",
+      "types": "./dist/errors.d.ts",
+      "import": "./dist/errors.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo",
+    "test": "vitest run --root ../.. packages/workos-token-verifier/src"
+  },
+  "dependencies": {
+    "@ohmyhost/workos-auth-contracts": "workspace:*"
+  }
+}

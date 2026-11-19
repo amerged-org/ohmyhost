@@ -1,0 +1,38 @@
+{
+  "name": "@ohmyhost/diagnostic-ingestion",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "ohmyhost": {
+    "deployment": "production",
+    "fakeProviderBoundary": {
+      "typescriptProject": "tsconfig.build.json",
+      "artifactRoot": "dist",
+      "entrypoints": [
+        "src/tail-main.ts",
+        "src/consumer-main.ts"
+      ],
+      "bundles": [
+        {
+          "entrypoint": "src/tail-main.ts",
+          "metafile": "dist/tail/metafile.json"
+        },
+        {
+          "entrypoint": "src/consumer-main.ts",
+          "metafile": "dist/consumer/metafile.json"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo",
+    "build": "tsc --project tsconfig.build.json && wrangler deploy --dry-run --config wrangler.tail.jsonc --outdir dist/tail --metafile dist/tail/metafile.json && wrangler deploy --dry-run --config wrangler.consumer.jsonc --outdir dist/consumer --metafile dist/consumer/metafile.json",
+    "test": "vitest run --root ../.. apps/diagnostic-ingestion"
+  },
+  "dependencies": {
+    "@ohmyhost/database": "workspace:*"
+  },
+  "devDependencies": {
+    "wrangler": "4.125.0"
+  }
+}

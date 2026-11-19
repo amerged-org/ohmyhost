@@ -1,0 +1,16 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-ai-gateway-local",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "enable_request_signal"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+  },
+  // The disabled default: no route, no cron and no AI_RUNTIME binding, so every request answers 503 ai_unavailable.
+  // The Development and Production profiles declare the Core binding, aggregate source-address limiter (3000/min),
+  // authenticated project limiter (600/min), orq origin and cron.
+}

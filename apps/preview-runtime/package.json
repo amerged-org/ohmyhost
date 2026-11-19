@@ -1,0 +1,45 @@
+{
+  "name": "@ohmyhost/preview-runtime",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "ohmyhost": {
+    "deployment": "production",
+    "fakeProviderBoundary": {
+      "typescriptProject": "tsconfig.build.json",
+      "artifactRoot": "dist",
+      "entrypoints": [
+        "src/index.ts",
+        "src/worker-main.ts"
+      ],
+      "bundles": [
+        {
+          "entrypoint": "src/worker-main.ts",
+          "metafile": "dist/worker-bundle/metafile.json"
+        }
+      ]
+    }
+  },
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json && wrangler deploy --dry-run --containers-rollout none --outdir dist/worker-bundle --metafile dist/worker-bundle/metafile.json --config wrangler.jsonc",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo",
+    "test": "vitest run --root ../.. apps/preview-runtime/test"
+  },
+  "dependencies": {
+    "@cloudflare/sandbox": "1.0.1",
+    "@ohmyhost/contracts": "workspace:*",
+    "@ohmyhost/customer-runtime": "workspace:*",
+    "@ohmyhost/platform": "workspace:*",
+    "@ohmyhost/wfp-dispatch": "workspace:*"
+  },
+  "devDependencies": {
+    "wrangler": "4.158.0"
+  }
+}

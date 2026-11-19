@@ -1,0 +1,23 @@
+{
+  "name": "@ohmyhost/build-broker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "coverage": "vitest run --root ../.. packages/build-broker/src --coverage --coverage.include='packages/build-broker/src/**/*.ts' --coverage.reporter=text --coverage.reporter=json-summary",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo",
+    "test": "vitest run --root ../.. packages/build-broker/src"
+  },
+  "dependencies": {
+    "@ohmyhost/contracts": "workspace:*",
+    "@ohmyhost/platform": "workspace:*"
+  }
+}

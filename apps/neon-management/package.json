@@ -1,0 +1,44 @@
+{
+  "name": "@ohmyhost/neon-management",
+  "version": "0.0.0",
+  "private": true,
+  "ohmyhost": {
+    "deployment": "production",
+    "fakeProviderBoundary": {
+      "typescriptProject": "tsconfig.build.json",
+      "artifactRoot": "dist",
+      "entrypoints": [
+        "src/worker-main.ts",
+        "src/pgcf-worker-main.ts"
+      ],
+      "bundles": [
+        {
+          "entrypoint": "src/worker-main.ts",
+          "metafile": "dist/worker-bundle/metafile.json"
+        },
+        {
+          "entrypoint": "src/pgcf-worker-main.ts",
+          "metafile": "dist/pgcf-worker-bundle/metafile.json"
+        }
+      ]
+    }
+  },
+  "type": "module",
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json && wrangler deploy --dry-run --outdir dist/worker-bundle --metafile dist/worker-bundle/metafile.json --config wrangler.jsonc && wrangler deploy --dry-run --outdir dist/pgcf-worker-bundle --metafile dist/pgcf-worker-bundle/metafile.json --config wrangler.pgcf.production.jsonc",
+    "test": "vitest run --root ../.. apps/neon-management/test",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo"
+  },
+  "dependencies": {
+    "@ohmyhost/database": "workspace:*",
+    "@ohmyhost/platform": "workspace:*",
+    "@ohmyhost/provider-cloudflare": "workspace:*",
+    "@ohmyhost/provider-pgcf": "workspace:*",
+    "pg": "8.22.0",
+    "@ohmyhost/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/pg": "8.20.0",
+    "wrangler": "4.125.0"
+  }
+}

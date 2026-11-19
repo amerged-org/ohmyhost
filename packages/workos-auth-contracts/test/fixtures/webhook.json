@@ -1,0 +1,6 @@
+{
+  "id": "event_fixture",
+  "event": "organization.updated",
+  "created_at": "2026-08-18T10:00:00.000Z",
+  "data": { "id": "org_fixture" }
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyhost-project-provisioning-publisher",
+  "main": "src/publisher-main.ts",
+  "compatibility_date": "2026-08-19",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": { "RUNTIME_CONFIGURATION_STATE": "disabled" },
+  "queues": {
+    "producers": [
+      {
+        "binding": "PROJECT_PROVISIONING_QUEUE",
+        "queue": "ohmyhost-project-provisioning",
+      },
+    ],
+  },
+  "triggers": { "crons": ["*/1 * * * *"] },
+}

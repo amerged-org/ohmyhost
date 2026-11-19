@@ -1,0 +1,8 @@
+{
+  "device_code": "fixture-device-code",
+  "user_code": "BCDF-GHJK",
+  "verification_uri": "https://auth.example.test/device",
+  "verification_uri_complete": "https://auth.example.test/device?user_code=BCDF-GHJK",
+  "expires_in": 300,
+  "interval": 5
+}

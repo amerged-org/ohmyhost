@@ -1,0 +1,35 @@
+{
+  "name": "@ohmyhost/functions-scheduler",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "ohmyhost": {
+    "deployment": "production",
+    "fakeProviderBoundary": {
+      "typescriptProject": "tsconfig.build.json",
+      "artifactRoot": "dist",
+      "entrypoints": [
+        "src/worker-main.ts"
+      ],
+      "bundles": [
+        {
+          "entrypoint": "src/worker-main.ts",
+          "metafile": "dist/worker-bundle/metafile.json"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json && wrangler deploy --dry-run --outdir dist/worker-bundle --metafile dist/worker-bundle/metafile.json --config wrangler.jsonc",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo",
+    "test": "vitest run --root ../.. apps/functions-scheduler"
+  },
+  "dependencies": {
+    "@ohmyhost/contracts": "workspace:*",
+    "@ohmyhost/database": "workspace:*",
+    "@ohmyhost/platform": "workspace:*"
+  },
+  "devDependencies": {
+    "wrangler": "4.124.0"
+  }
+}

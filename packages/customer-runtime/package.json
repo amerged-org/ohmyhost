@@ -1,0 +1,77 @@
+{
+  "name": "@ohmyhost/customer-runtime",
+  "version": "0.1.70",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./mail": {
+      "source": "./src/mail.ts",
+      "types": "./dist/mail.d.ts",
+      "import": "./dist/mail.js"
+    },
+    "./mail-attachment": {
+      "source": "./src/mail-attachment.ts",
+      "types": "./dist/mail-attachment.d.ts",
+      "import": "./dist/mail-attachment.js"
+    },
+    "./database": {
+      "source": "./src/database.ts",
+      "types": "./dist/database.d.ts",
+      "import": "./dist/database.js"
+    },
+    "./database-kysely": {
+      "source": "./src/database-kysely.ts",
+      "types": "./dist/database-kysely.d.ts",
+      "import": "./dist/database-kysely.js"
+    },
+    "./database-rls": {
+      "source": "./src/database-rls.ts",
+      "types": "./dist/database-rls.d.ts",
+      "import": "./dist/database-rls.js"
+    },
+    "./auth-server": {
+      "source": "./src/auth-server.ts",
+      "types": "./dist/auth-server.d.ts",
+      "import": "./dist/auth-server.js"
+    },
+    "./auth-browser": {
+      "source": "./src/auth-browser.ts",
+      "types": "./dist/auth-browser.d.ts",
+      "import": "./dist/auth-browser.js"
+    },
+    "./preview-transport": {
+      "source": "./src/preview-transport.ts",
+      "types": "./dist/preview-transport.d.ts",
+      "import": "./dist/preview-transport.js"
+    },
+    "./storage": {
+      "source": "./src/storage.ts",
+      "types": "./dist/storage.d.ts",
+      "import": "./dist/storage.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "coverage": "vitest run --root ../.. packages/customer-runtime/src --coverage --coverage.include='packages/customer-runtime/src/**/*.ts' --coverage.reporter=text --coverage.reporter=json-summary",
+    "test": "vitest run --root ../.. packages/customer-runtime/src",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo"
+  },
+  "dependencies": {
+    "better-auth": "1.7.7",
+    "kysely": "0.29.5"
+  },
+  "peerDependencies": {
+    "kysely": "^0.29.5"
+  },
+  "peerDependenciesMeta": {
+    "kysely": {
+      "optional": true
+    }
+  }
+}

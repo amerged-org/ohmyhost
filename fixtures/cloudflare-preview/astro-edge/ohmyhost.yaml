@@ -1,0 +1,15 @@
+version: 1
+project: astro-edge-acceptance
+build:
+  install: npm ci --ignore-scripts
+  command: npm run build
+  output: dist/client
+runtime:
+  mode: edge
+database:
+  enabled: true
+  migrations: postgres/migrations
+auth:
+  provider: none
+mail:
+  enabled: false

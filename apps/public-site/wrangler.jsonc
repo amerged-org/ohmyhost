@@ -1,0 +1,28 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-public-production",
+  "account_id": "00000000000000000000000000000001",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-09-05",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    { "pattern": "omh.st/*", "zone_id": "0000000000000000000000000000000b" },
+    { "pattern": "ohmyho.st", "custom_domain": true },
+    { "pattern": "www.ohmyho.st", "custom_domain": true },
+    { "pattern": "check.omh.st", "custom_domain": true },
+    { "pattern": "dev.check.omh.st", "custom_domain": true },
+  ],
+  "services": [
+    { "binding": "CONTROL_API", "service": "ohmyho-control-api-production" },
+    // Released from amerged-org/ohmyhost-web; this entry keeps the hostname and the downloads.
+    { "binding": "WEBSITE", "service": "ohmyho-web-production" },
+  ],
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "html_handling": "none",
+  },
+  "observability": { "enabled": true, "logs": { "invocation_logs": false } },
+}

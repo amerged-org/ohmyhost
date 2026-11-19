@@ -1,0 +1,9 @@
+extends:
+  - spec
+
+apis:
+  ohmyhost@v1:
+    root: ./packages/contracts/openapi.yaml
+
+rules:
+  no-unused-components: off

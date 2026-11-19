@@ -1,0 +1,39 @@
+{
+  "name": "@ohmyhost/build-runner",
+  "version": "0.0.0",
+  "private": true,
+  "ohmyhost": {
+    "deployment": "production",
+    "fakeProviderBoundary": {
+      "typescriptProject": "tsconfig.build.json",
+      "artifactRoot": "dist",
+      "entrypoints": [
+        "src/index.ts",
+        "src/worker-main.ts"
+      ],
+      "bundles": []
+    }
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "coverage": "vitest run --root ../.. apps/build-runner/test --coverage --coverage.include='apps/build-runner/src/**/*.ts' --coverage.reporter=text --coverage.reporter=json-summary",
+    "deploy:dry-run": "wrangler deploy --dry-run --containers-rollout none --outdir .wrangler/dry-run",
+    "test": "vitest run --root ../.. apps/build-runner/test",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "0.3.7",
+    "@ohmyhost/build-broker": "workspace:*"
+  },
+  "devDependencies": {
+    "wrangler": "4.125.0"
+  }
+}

@@ -1,0 +1,27 @@
+# Gateway canary: a customer-style functions project that proves the private mail and storage
+# gateways and the database keep working under the real dispatch and egress policy.
+# Deploy it as its own project to Development and then Production, created with region eu;
+# src/ohmyhost/worker.ts explains what it needs and what each run proves.
+version: 1
+project: gateway-canary
+build:
+  install: pnpm install --frozen-lockfile --ignore-scripts
+runtime:
+  mode: functions
+  healthcheck: /health
+database:
+  enabled: true
+  migrations: postgres/migrations
+mail:
+  enabled: true
+storage:
+  provider: r2
+  # Must equal the region of the project created for the canary, which is eu. The EU host is the
+  # only R2 data-plane host with recorded use, so a US value could turn the deep tick red for a
+  # reason that has nothing to do with the egress.
+  jurisdiction: eu
+  public: false
+functions:
+  crons:
+    - "*/5 * * * *"
+    - "3 * * * *"

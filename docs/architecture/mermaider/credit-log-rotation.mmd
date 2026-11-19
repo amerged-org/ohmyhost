@@ -1,0 +1,18 @@
+sequenceDiagram
+    participant n_312caa8773e6 as Cron trigger
+    participant n_f0e453cbd0cf as Credit Service
+    participant n_f5d0c5fddfd3 as Core credit runtime
+    participant n_1771fc0db58e as Credit log bucket (R2)
+    participant n_98c79d1a0ca6 as Control API
+    n_312caa8773e6->>n_f0e453cbd0cf: Rotate#58; 00#58;00 UTC cron, or the end of an hourly pass
+    n_f0e453cbd0cf->>n_f5d0c5fddfd3: Read every usage cursor#59; wait until all passed 00#58;00 UTC
+    n_f0e453cbd0cf->>n_f5d0c5fddfd3: Page the log rows before today 00#58;00 UTC
+    n_f0e453cbd0cf->>n_1771fc0db58e: Create each day and shard object once#59; an existing one must match
+    n_f0e453cbd0cf->>n_1771fc0db58e: Create the day manifest the same way
+    n_f0e453cbd0cf->>n_1771fc0db58e: Read every shard back#59; count and SHA-256 must match
+    n_f0e453cbd0cf->>n_f5d0c5fddfd3: Delete the archived rows, as the last step
+    n_f5d0c5fddfd3-->>n_f0e453cbd0cf: Deleted count#59; a mismatch is reported as a problem
+    n_98c79d1a0ca6->>n_f0e453cbd0cf: Usage report for an organization
+    n_f0e453cbd0cf->>n_f5d0c5fddfd3: Read the organization's rows still in the Core
+    n_f0e453cbd0cf->>n_1771fc0db58e: Read its shard of each rotated day
+    n_f0e453cbd0cf-->>n_98c79d1a0ca6: Rows merged by key, ordered by time

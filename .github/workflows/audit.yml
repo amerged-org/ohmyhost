@@ -1,0 +1,81 @@
+name: Scheduled checks
+
+# Notices, not release gates: the manually dispatched CI still runs the same checks on the exact
+# commit and stays the only approval.
+# - Every morning the audit reports a newly published advisory before a release instead of letting
+#   it fail the release candidate.
+# - Every Sunday a build and typecheck from a clean checkout, with no cache of any kind, repeats what
+#   the CI speeds up with restored Turbo outputs and TypeScript build information: a red run here
+#   after a green CI means a restored cache hid a build or type failure, or a stale tracked
+#   generated file. It compares no output with what a cache replays, so a stale replay of an input
+#   nobody declared stays green here.
+on:
+  schedule:
+    - cron: "23 5 * * *"
+    - cron: "17 3 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: audit-${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: Audit workspace and fixture lockfiles
+    if: ${{ github.event.schedule != '17 3 * * 0' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      # The audit reads only package.json and the lockfiles, so nothing is installed.
+      - name: Install pnpm
+        uses: pnpm/action-setup@ff378ebe6b225b0680b81c1ad4498ae0d1d3a5e3
+        with:
+          version: 10.28.2
+          run_install: false
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24.6.0
+      - name: Audit dependencies
+        run: pnpm audit:moderate
+
+  cold:
+    name: Build and typecheck without any cache
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '17 3 * * 0' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      # Nothing is restored here, not even the pnpm store: the lockfile and the sources alone decide.
+      - name: Install pnpm
+        uses: pnpm/action-setup@ff378ebe6b225b0680b81c1ad4498ae0d1d3a5e3
+        with:
+          version: 10.28.2
+          run_install: false
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24.6.0
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build every workspace package from scratch
+        run: pnpm build
+        env:
+          TURBO_FORCE: "true"
+      # A generator that rewrites a tracked file means the committed copy is stale.
+      - name: Require the build to leave every tracked file as committed
+        run: |
+          git status --porcelain=v1 --untracked-files=all
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+      - name: Typecheck every workspace package from scratch
+        run: pnpm typecheck

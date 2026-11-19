@@ -1,0 +1,28 @@
+lockfileVersion: "9.0"
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+  .:
+    dependencies:
+      "@ohmyhost/customer-runtime":
+        specifier: npm:@amerged/ohmyhost-runtime@0.1.37
+        version: "@amerged/ohmyhost-runtime@0.1.37"
+
+packages:
+  "@amerged/ohmyhost-runtime@0.1.37":
+    resolution:
+      {
+        integrity: sha512-805K0Z5gLiY0Gj9buBhRAh/bxPMksgEGlmkB5V1seRxYzyTQ6sjw/9MxTk1PJT+Fx+iMNElo79ogviYaK967Cg==,
+      }
+    engines: { node: ">=22" }
+    peerDependencies:
+      kysely: 0.29.5
+    peerDependenciesMeta:
+      kysely:
+        optional: true
+
+snapshots:
+  "@amerged/ohmyhost-runtime@0.1.37": {}

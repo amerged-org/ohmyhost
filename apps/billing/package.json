@@ -1,0 +1,43 @@
+{
+  "name": "@ohmyhost/billing",
+  "version": "0.0.0",
+  "private": true,
+  "ohmyhost": {
+    "deployment": "production",
+    "fakeProviderBoundary": {
+      "typescriptProject": "tsconfig.build.json",
+      "artifactRoot": "dist",
+      "entrypoints": [
+        "src/runtime.ts",
+        "src/http.ts",
+        "src/worker-main.ts"
+      ],
+      "bundles": [
+        {
+          "entrypoint": "src/worker-main.ts",
+          "metafile": "dist/worker-bundle/metafile.json"
+        }
+      ]
+    }
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/runtime.ts",
+      "types": "./dist/runtime.d.ts",
+      "import": "./dist/runtime.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json && wrangler deploy --dry-run --outdir dist/worker-bundle --metafile dist/worker-bundle/metafile.json --config wrangler.jsonc",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo"
+  },
+  "dependencies": {
+    "@ohmyhost/contracts": "workspace:*",
+    "@ohmyhost/platform": "workspace:*",
+    "@ohmyhost/provider-stripe": "workspace:*"
+  },
+  "devDependencies": {
+    "wrangler": "4.125.0"
+  }
+}

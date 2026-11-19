@@ -1,0 +1,35 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyhost-project-provisioning-consumer",
+  "main": "src/consumer-main.ts",
+  "compatibility_date": "2026-08-19",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": { "RUNTIME_CONFIGURATION_STATE": "disabled" },
+  "queues": {
+    "consumers": [
+      {
+        "queue": "ohmyhost-project-provisioning",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 30,
+        "dead_letter_queue": "ohmyhost-project-provisioning-dlq",
+      },
+    ],
+  },
+  "workflows": [
+    {
+      "name": "ohmyhost-project-provisioning-v1",
+      "binding": "PROJECT_PROVISIONING_WORKFLOW",
+      "class_name": "ProjectProvisioningWorkflow",
+      "script_name": "ohmyhost-project-provisioning-workflow",
+    },
+    {
+      "name": "ohmyhost-deployment-workflow-v1",
+      "binding": "DEPLOYMENT_WORKFLOW",
+      "class_name": "DeploymentWorkflow",
+      "script_name": "ohmyhost-deployment-workflow",
+    },
+  ],
+}

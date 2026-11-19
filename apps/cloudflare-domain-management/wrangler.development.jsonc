@@ -1,0 +1,76 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-cloudflare-domain-management-poc-private-fullstack",
+  "account_id": "00000000000000000000000000000001",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-08-29",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": { "enabled": true, "head_sampling_rate": 1, "persist": true, "invocation_logs": true },
+    "traces": { "enabled": false, "persist": true, "head_sampling_rate": 1 },
+  },
+  "vars": {
+    "RUNTIME_CONFIGURATION_STATE": "configured",
+    "CLOUDFLARE_ACCOUNT_ID": "00000000000000000000000000000001",
+    "CLOUDFLARE_PLATFORM_ZONE_ID": "0000000000000000000000000000000b",
+    "CLOUDFLARE_SAAS_ZONE_ID": "0000000000000000000000000000000b",
+    "CLOUDFLARE_SAAS_CNAME_TARGET": "customers.omh.st",
+    "CLOUDFLARE_OAUTH_CLIENT_ID": "0000000000000000000000000000000c",
+    "CLOUDFLARE_OAUTH_REDIRECT_URI": "https://dev.app.ohmyho.st/v1/cloudflare/oauth/callback",
+    "CLOUDFLARE_OAUTH_STATE_FORMAT": "json-v1",
+    "CLOUDFLARE_OAUTH_TOKEN_CIPHER_KEY_VERSION": "20261106",
+  },
+  // Activation requires saved new custody, retained historical readers and old/new grant checks.
+  "secrets": {
+    "required": [
+      "CLOUDFLARE_OAUTH_TOKEN_CIPHER_KEY_BASE64",
+      "CLOUDFLARE_OAUTH_TOKEN_CIPHER_ADDITIONAL_KEYS_JSON",
+    ],
+  },
+  "services": [
+    {
+      "binding": "NATIVE_AUTH_ADMIN_US",
+      "service": "ohmyho-native-auth-development-us",
+      "entrypoint": "NativePolicyService",
+    },
+    {
+      "binding": "NATIVE_AUTH_ADMIN_EU",
+      "service": "ohmyho-native-auth-development-eu",
+      "entrypoint": "NativePolicyService",
+    },
+    {
+      "binding": "GENERAL_CF_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "CloudflareDomainRuntime",
+    },
+    {
+      "binding": "SCOPED_DNS_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "ScopedDnsRuntime",
+    },
+    {
+      "binding": "APPLICATION_IDENTITY_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "ApplicationIdentityRuntime",
+    },
+    {
+      "binding": "MAIL_DNS_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "MailDnsRuntime",
+    },
+    {
+      "binding": "RUNTIME_PROBES",
+      "service": "ohmyho-control-api-poc-private-fullstack",
+      "entrypoint": "RuntimeCreditService",
+    },
+    {
+      "binding": "DEV_ACCESS",
+      "service": "ohmyho-control-api-poc-private-fullstack",
+      "entrypoint": "DevAccessService",
+    },
+  ],
+}

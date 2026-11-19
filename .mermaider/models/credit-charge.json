@@ -1,0 +1,333 @@
+{
+  "version": 1,
+  "review": "reviewed",
+  "diagram": {
+    "id": "credit-charge",
+    "title": "Core credit account — charging one posted usage window",
+    "family": "process",
+    "syntax": "flowchart",
+    "provenance": "curated",
+    "context": "implemented",
+    "nodes": [
+      {
+        "id": "post",
+        "label": "postUsage for one posting of one organization, usage source and window: a whole window or one part of a split window; a native Auth line outside the PGCF memory meter is refused before any write",
+        "evidence": [
+          {
+            "line": 186,
+            "path": "apps/control-store/src/catalog/credit/runtime.ts",
+            "sha256": "844b12ac4786f407074de842adb590a375e085439e8f7258a552f643e572ab15",
+            "symbol": "createCreditCommands"
+          }
+        ]
+      },
+      {
+        "id": "empty",
+        "label": "No usage lines: nothing is posted and the balance is only read",
+        "evidence": [
+          {
+            "line": 186,
+            "path": "apps/control-store/src/catalog/credit/runtime.ts",
+            "sha256": "844b12ac4786f407074de842adb590a375e085439e8f7258a552f643e572ab15",
+            "symbol": "createCreditCommands"
+          }
+        ]
+      },
+      {
+        "id": "ensure",
+        "label": "Create the account on first touch, only for an existing organization",
+        "evidence": [
+          {
+            "line": 205,
+            "path": "apps/control-store/src/catalog/credit/account.ts",
+            "sha256": "017446efd541c0cb9dec9ac75067cf575b89bf120912814e307632d132799346",
+            "symbol": "ensureStatement"
+          }
+        ]
+      },
+      {
+        "id": "renew",
+        "label": "Lapsed month: expire the remainder, renew the Free or Paid allowance, and restart the month's overrun count (logged once)",
+        "evidence": [
+          {
+            "line": 230,
+            "path": "apps/control-store/src/catalog/credit/account.ts",
+            "sha256": "f12c777b11a993c3d858324c76334a08534891fa03bb067662586237b078dfda",
+            "symbol": "renewalStatements"
+          }
+        ]
+      },
+      {
+        "id": "spend",
+        "label": "Spend monthly, then one-time balance; the rest is platform overrun, which the charge does not cap (at the monthly USD 50 ceiling a balance-less organization is denied serving); set or clear exhaustion",
+        "evidence": [
+          {
+            "line": 24,
+            "path": "apps/control-store/src/catalog/credit/spend.ts",
+            "sha256": "b827173629d23156f7cf05d99cab4ab26dca3ecd57076427d320184454bd9ae8",
+            "symbol": "spendAssignments"
+          },
+          {
+            "line": 59,
+            "path": "apps/control-store/src/catalog/credit/decision.ts",
+            "sha256": "ab065a9e491f289df98275c9285148fd4ad9e9c63524f29c3cf928b3512aab71",
+            "symbol": "runtimeDecision"
+          }
+        ]
+      },
+      {
+        "id": "log",
+        "label": "Insert the credit_log row first, under the unique key of the posting (usage:source:organization:window, with :pN for a part above 0), filed at the window start or at the Core's clock when replayed; detail.spent holds the monthly, one-time and overrun parts the spend takes, and the balance it leaves",
+        "evidence": [
+          {
+            "line": 84,
+            "path": "apps/control-store/src/catalog/credit/spend.ts",
+            "sha256": "243c8c8e9932463562894ddf3b58103b102bc76cd241529c9f2a6f34ea2f3b5d",
+            "symbol": "chargeOrg"
+          }
+        ]
+      },
+      {
+        "id": "project",
+        "label": "Add each project's share to its use of the UTC month",
+        "evidence": [
+          {
+            "line": 33,
+            "path": "apps/control-store/src/catalog/credit/spend.ts",
+            "sha256": "505cc678e276b18dc21efbd11eabb8c04221d792179f06cf82cbda0a208d7085",
+            "symbol": "PROJECT_USE_CONFLICT"
+          },
+          {
+            "line": 84,
+            "path": "apps/control-store/src/catalog/credit/spend.ts",
+            "sha256": "243c8c8e9932463562894ddf3b58103b102bc76cd241529c9f2a6f34ea2f3b5d",
+            "symbol": "chargeOrg"
+          }
+        ]
+      },
+      {
+        "id": "applied",
+        "label": "The batch committed: posted, with the new balance",
+        "evidence": [
+          {
+            "line": 148,
+            "path": "apps/control-store/src/catalog/credit/spend.ts",
+            "sha256": "cb147132610fe999d7b8eea4a3b8dbd1393494fa55493f157ab9f29cbd1b28c4",
+            "symbol": "runChargeOrg"
+          }
+        ]
+      },
+      {
+        "id": "duplicate",
+        "label": "Key logged before: the batch rolls back, result posted false",
+        "evidence": [
+          {
+            "line": 148,
+            "path": "apps/control-store/src/catalog/credit/spend.ts",
+            "sha256": "cb147132610fe999d7b8eea4a3b8dbd1393494fa55493f157ab9f29cbd1b28c4",
+            "symbol": "runChargeOrg"
+          },
+          {
+            "line": 43,
+            "path": "apps/control-store/src/catalog/credit/spend.ts",
+            "sha256": "7df0acd24a13f29f7e91ff56a5abbc1b9877b992c20b9d1362d70f564cbac3f3",
+            "symbol": "isDuplicate"
+          }
+        ]
+      },
+      {
+        "id": "layout",
+        "label": "In the same batch a guard refuses a window that is already booked in the other layout (whole or split into parts)",
+        "evidence": [
+          {
+            "line": 84,
+            "path": "apps/control-store/src/catalog/credit/spend.ts",
+            "sha256": "243c8c8e9932463562894ddf3b58103b102bc76cd241529c9f2a6f34ea2f3b5d",
+            "symbol": "chargeOrg"
+          }
+        ]
+      },
+      {
+        "id": "layout_refused",
+        "label": "Other layout booked: the batch rolls back with the answer layout; the service posts in the booked layout",
+        "evidence": [
+          {
+            "line": 84,
+            "path": "apps/control-store/src/catalog/credit/spend.ts",
+            "sha256": "243c8c8e9932463562894ddf3b58103b102bc76cd241529c9f2a6f34ea2f3b5d",
+            "symbol": "chargeOrg"
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "id": "post-empty",
+        "from": "post",
+        "to": "empty",
+        "label": "Lines array is empty",
+        "evidence": [
+          {
+            "line": 186,
+            "path": "apps/control-store/src/catalog/credit/runtime.ts",
+            "sha256": "844b12ac4786f407074de842adb590a375e085439e8f7258a552f643e572ab15",
+            "symbol": "createCreditCommands"
+          }
+        ]
+      },
+      {
+        "id": "ensure-renew",
+        "from": "ensure",
+        "to": "renew",
+        "label": "Next statement of the batch",
+        "evidence": [
+          {
+            "line": 84,
+            "path": "apps/control-store/src/catalog/credit/spend.ts",
+            "sha256": "243c8c8e9932463562894ddf3b58103b102bc76cd241529c9f2a6f34ea2f3b5d",
+            "symbol": "chargeOrg"
+          }
+        ]
+      },
+      {
+        "id": "renew-log",
+        "from": "renew",
+        "to": "log",
+        "label": "Next statement of the batch",
+        "evidence": [
+          {
+            "line": 84,
+            "path": "apps/control-store/src/catalog/credit/spend.ts",
+            "sha256": "243c8c8e9932463562894ddf3b58103b102bc76cd241529c9f2a6f34ea2f3b5d",
+            "symbol": "chargeOrg"
+          }
+        ]
+      },
+      {
+        "id": "log-spend",
+        "from": "log",
+        "to": "spend",
+        "label": "Next statement of the batch: the spend that the logged parts describe",
+        "evidence": [
+          {
+            "line": 84,
+            "path": "apps/control-store/src/catalog/credit/spend.ts",
+            "sha256": "243c8c8e9932463562894ddf3b58103b102bc76cd241529c9f2a6f34ea2f3b5d",
+            "symbol": "chargeOrg"
+          }
+        ]
+      },
+      {
+        "id": "spend-project",
+        "from": "spend",
+        "to": "project",
+        "label": "With project share",
+        "evidence": [
+          {
+            "line": 84,
+            "path": "apps/control-store/src/catalog/credit/spend.ts",
+            "sha256": "243c8c8e9932463562894ddf3b58103b102bc76cd241529c9f2a6f34ea2f3b5d",
+            "symbol": "chargeOrg"
+          }
+        ]
+      },
+      {
+        "id": "project-applied",
+        "from": "project",
+        "to": "applied",
+        "label": "Batch commits",
+        "evidence": [
+          {
+            "line": 148,
+            "path": "apps/control-store/src/catalog/credit/spend.ts",
+            "sha256": "cb147132610fe999d7b8eea4a3b8dbd1393494fa55493f157ab9f29cbd1b28c4",
+            "symbol": "runChargeOrg"
+          }
+        ]
+      },
+      {
+        "id": "spend-applied",
+        "from": "spend",
+        "to": "applied",
+        "label": "No project share",
+        "evidence": [
+          {
+            "line": 84,
+            "path": "apps/control-store/src/catalog/credit/spend.ts",
+            "sha256": "243c8c8e9932463562894ddf3b58103b102bc76cd241529c9f2a6f34ea2f3b5d",
+            "symbol": "chargeOrg"
+          },
+          {
+            "line": 148,
+            "path": "apps/control-store/src/catalog/credit/spend.ts",
+            "sha256": "cb147132610fe999d7b8eea4a3b8dbd1393494fa55493f157ab9f29cbd1b28c4",
+            "symbol": "runChargeOrg"
+          }
+        ]
+      },
+      {
+        "id": "log-duplicate",
+        "from": "log",
+        "to": "duplicate",
+        "label": "UNIQUE credit_log key violated",
+        "evidence": [
+          {
+            "line": 148,
+            "path": "apps/control-store/src/catalog/credit/spend.ts",
+            "sha256": "cb147132610fe999d7b8eea4a3b8dbd1393494fa55493f157ab9f29cbd1b28c4",
+            "symbol": "runChargeOrg"
+          },
+          {
+            "line": 43,
+            "path": "apps/control-store/src/catalog/credit/spend.ts",
+            "sha256": "7df0acd24a13f29f7e91ff56a5abbc1b9877b992c20b9d1362d70f564cbac3f3",
+            "symbol": "isDuplicate"
+          }
+        ]
+      },
+      {
+        "id": "post-layout",
+        "from": "post",
+        "to": "layout",
+        "label": "Lines present",
+        "evidence": [
+          {
+            "line": 186,
+            "path": "apps/control-store/src/catalog/credit/runtime.ts",
+            "sha256": "844b12ac4786f407074de842adb590a375e085439e8f7258a552f643e572ab15",
+            "symbol": "createCreditCommands"
+          }
+        ]
+      },
+      {
+        "id": "layout-ensure",
+        "from": "layout",
+        "to": "ensure",
+        "label": "Layout free or the same: one D1 batch",
+        "evidence": [
+          {
+            "line": 84,
+            "path": "apps/control-store/src/catalog/credit/spend.ts",
+            "sha256": "243c8c8e9932463562894ddf3b58103b102bc76cd241529c9f2a6f34ea2f3b5d",
+            "symbol": "chargeOrg"
+          }
+        ]
+      },
+      {
+        "id": "layout-layout_refused",
+        "from": "layout",
+        "to": "layout_refused",
+        "label": "The other layout is booked",
+        "evidence": [
+          {
+            "line": 84,
+            "path": "apps/control-store/src/catalog/credit/spend.ts",
+            "sha256": "243c8c8e9932463562894ddf3b58103b102bc76cd241529c9f2a6f34ea2f3b5d",
+            "symbol": "chargeOrg"
+          }
+        ]
+      }
+    ],
+    "direction": "TD"
+  }
+}

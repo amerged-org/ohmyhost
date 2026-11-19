@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ES2024", "DOM"],
+    "types": ["./src/cloudflare-workers.d.ts", "node"]
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

@@ -1,0 +1,32 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-functions-scheduler-poc-private-fullstack",
+  "account_id": "00000000000000000000000000000001",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-08-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "vars": {
+    "RUNTIME_CONFIGURATION_STATE": "configured",
+  },
+  "dispatch_namespaces": [
+    {
+      "binding": "CUSTOMER_DISPATCH",
+      "namespace": "ohmyho-poc-private-fullstack",
+      "outbound": {
+        "service": "ohmyho-wfp-egress-v3-poc-private-fullstack",
+        "parameters": ["EGRESS_CONTEXT"],
+      },
+    },
+  ],
+  "triggers": { "crons": ["* * * * *"] },
+  "services": [
+    {
+      "binding": "CONTROL_FUNCTIONS_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "FunctionsSchedulerRuntime",
+    },
+  ],
+}

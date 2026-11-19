@@ -1,0 +1,12 @@
+version: 1
+project: tanstack-edge
+build:
+  install: pnpm install --frozen-lockfile --ignore-scripts
+  command: pnpm run build
+  output: dist/client
+runtime:
+  mode: edge
+database:
+  enabled: false
+mail:
+  enabled: false

@@ -1,0 +1,24 @@
+{
+  "name": "@ohmyhost/adapter-next",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "coverage": "vitest run --root ../.. packages/adapter-next/src --coverage --coverage.include='packages/adapter-next/src/**/*.ts' --coverage.reporter=text --coverage.reporter=json-summary",
+    "test": "vitest run --root ../.. packages/adapter-next/src",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo"
+  },
+  "dependencies": {
+    "@babel/parser": "7.29.8",
+    "@ohmyhost/contracts": "workspace:*",
+    "@ohmyhost/platform": "workspace:*"
+  }
+}

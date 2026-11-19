@@ -1,0 +1,186 @@
+{
+  "schema_version": 1,
+  "source": {
+    "artifact": "ohmyhost-native-human-copy-0.1.52-r4-review.zip",
+    "sha256": "913d802adaf04efdccb85272056f9c6c7b9ab4c904f5e9894f5d7bdb7ceed44e",
+    "package_version": "0.1.52",
+    "entry_count": 30,
+    "skill_count": 10,
+    "endpoint": "https://app.ohmyho.st/mcp"
+  },
+  "promises": [
+    {
+      "tool": "database_compute_get",
+      "source_skill": "skills/ohmyhost-manage-database/SKILL.md",
+      "source_line": 8,
+      "source_sha256": "454e611277df32721a497d822afcbc8f08c47010e41932e9acf6dfb30c051418",
+      "input_properties": ["project_id", "environment"],
+      "argument_semantics": "Read actual compute metadata for the explicitly selected Dev or Prod environment without waking the database."
+    },
+    {
+      "tool": "database_compute_set",
+      "source_skill": "skills/ohmyhost-manage-database/SKILL.md",
+      "source_line": 20,
+      "source_sha256": "454e611277df32721a497d822afcbc8f08c47010e41932e9acf6dfb30c051418",
+      "input_properties": ["project_id", "environment", "memory_mib", "confirm", "idempotency_key"],
+      "argument_semantics": "Requested resize uses memory_mib 256/512/1024/2048/4096, confirmation and one retained key; poll the operation and read actual compute."
+    },
+    {
+      "tool": "database_query",
+      "source_skill": "skills/ohmyhost-manage-database/SKILL.md",
+      "source_line": 28,
+      "source_sha256": "454e611277df32721a497d822afcbc8f08c47010e41932e9acf6dfb30c051418",
+      "input_properties": ["project_id", "environment", "statement", "parameters"],
+      "argument_semantics": "One SELECT/WITH statement with scalar parameters, explicit dev/prod selection and application RLS; at most100rows/five seconds."
+    },
+    {
+      "tool": "database_write",
+      "source_skill": "skills/ohmyhost-manage-database/SKILL.md",
+      "source_line": 30,
+      "source_sha256": "454e611277df32721a497d822afcbc8f08c47010e41932e9acf6dfb30c051418",
+      "input_properties": [
+        "project_id",
+        "environment",
+        "statement",
+        "parameters",
+        "confirmed",
+        "idempotency_key"
+      ],
+      "argument_semantics": "Requested parameterized INSERT/UPDATE/DELETE, confirmed:true, explicit environment and retained key; inspect actual business receipt state, not HTTP status alone."
+    },
+    {
+      "tool": "organization_credits_get",
+      "source_skill": "skills/ohmyhost-usage-and-budgets/SKILL.md",
+      "source_line": 8,
+      "source_sha256": "b4a95d249bc255b14a486321ce7a62d134a6ca95e3a020025a3492982a7a2f7e",
+      "input_properties": ["organization_id"],
+      "argument_semantics": "Read credits for the organization selected from verified identity."
+    },
+    {
+      "tool": "organization_usage_get",
+      "source_skill": "skills/ohmyhost-usage-and-budgets/SKILL.md",
+      "source_line": 8,
+      "source_sha256": "b4a95d249bc255b14a486321ce7a62d134a6ca95e3a020025a3492982a7a2f7e",
+      "input_properties": ["organization_id"],
+      "argument_semantics": "Read billed usage for the organization selected from verified identity."
+    },
+    {
+      "tool": "project_budget_get",
+      "source_skill": "skills/ohmyhost-usage-and-budgets/SKILL.md",
+      "source_line": 8,
+      "source_sha256": "b4a95d249bc255b14a486321ce7a62d134a6ca95e3a020025a3492982a7a2f7e",
+      "input_properties": ["project_id"],
+      "argument_semantics": "Read the selected project-specific budget."
+    },
+    {
+      "tool": "project_budget_set",
+      "source_skill": "skills/ohmyhost-usage-and-budgets/SKILL.md",
+      "source_line": 20,
+      "source_sha256": "b4a95d249bc255b14a486321ce7a62d134a6ca95e3a020025a3492982a7a2f7e",
+      "input_properties": ["project_id", "amount_micros", "mode", "idempotency_key"],
+      "argument_semantics": "Only requested changes; explain stop mode and read back the result. amount_micros/mode are the existing named MCP contract for the described credit limit and selected continue/stop mode."
+    },
+    {
+      "tool": "feedback_submit",
+      "source_skill": "skills/ohmyhost-troubleshoot-deployment/SKILL.md",
+      "source_line": 77,
+      "source_sha256": "d5a3fdbc30068eba2ecbd2f383c124d30d676d2b402a043853793ae644acf73d",
+      "input_properties": ["organization_id", "kind", "title", "description", "idempotency_key"],
+      "argument_semantics": "Report only actual redacted expected/actual behavior under the requested support scope; do not claim submission without a receipt."
+    },
+    {
+      "tool": "feedback_status",
+      "source_skill": "skills/ohmyhost-troubleshoot-deployment/SKILL.md",
+      "source_line": 81,
+      "source_sha256": "d5a3fdbc30068eba2ecbd2f383c124d30d676d2b402a043853793ae644acf73d",
+      "input_properties": ["feedback_id", "cursor"],
+      "argument_semantics": "Observe the original feedback receipt; read history pages using returned next_cursor as cursor."
+    }
+  ],
+  "intentional_local_or_handoff": [
+    {
+      "tool": "project_export_create",
+      "reason": "The submitted export Skill requires an absolute private password_file on the local MCP machine; W51 introduces no new remote password UI."
+    },
+    {
+      "tool": "database_access_create",
+      "reason": "Raw connection credential delivery remains a local/direct REST workflow."
+    },
+    {
+      "tool": "source_publish",
+      "reason": "Reading a local working directory requires the separately selected local MCP."
+    },
+    {
+      "tool": "database_webhook_create",
+      "reason": "Webhook creation returns a signing credential; no remote secret-return channel is introduced."
+    },
+    {
+      "tool": "mail_webhook_set",
+      "reason": "Mail webhook preparation returns signing_secret and remains a private local/direct REST custody step."
+    },
+    {
+      "tool": "mail_webhook_rotate",
+      "reason": "Mail webhook rotation returns signing_secret and remains a private local/direct REST custody step."
+    }
+  ],
+  "stale_remote_limitations": [
+    {
+      "source_skill": "skills/ohmyhost-get-started/SKILL.md",
+      "source_line": 8,
+      "claim": "The current remote catalog does not provide `feedback_submit` or `feedback_status`."
+    },
+    {
+      "source_skill": "skills/ohmyhost-troubleshoot-deployment/SKILL.md",
+      "source_line": 8,
+      "claim": "The current remote catalog does not provide `feedback_submit` or `feedback_status`."
+    },
+    {
+      "source_skill": "skills/ohmyhost-manage-database/SKILL.md",
+      "source_line": 105,
+      "claim": "The local server adds webhook/schedule mutation tools."
+    },
+    {
+      "source_skill": "skills/ohmyhost-manage-database/SKILL.md",
+      "source_line": 160,
+      "claim": "The remote MCP cannot create or delete watches."
+    }
+  ],
+  "claude_variant": {
+    "variant": "claude-directory-remote-only",
+    "package_version": "0.1.52",
+    "endpoint": "https://app.ohmyho.st/mcp",
+    "source_receipt_sha256": "c699d96d4e545c4c66e3755f02a761a037b6094f628c1f2cdf89bd5bd4365420",
+    "workflow_count": 4,
+    "workflow_sha256": {
+      "skills/ohmyhost-get-started/SKILL.md": "c133b53ac0f8d0723fc042a48c116c8ab427f5782c731296342093aeea1f8451",
+      "skills/ohmyhost-build-portable-app/SKILL.md": "d428ae9a188ee3a33ee04e74dc8227959dff7f1a21b95f3b1aa853810f424ed0",
+      "skills/ohmyhost-deploy/SKILL.md": "211a46ed8b8b3ad31d4df70c4d1d484117c543c32b8b9e4820863978fc09b18a",
+      "skills/ohmyhost-troubleshoot-deployment/SKILL.md": "08b033ef79e5e5bc4c41c342eff65bfda836e9c465da605213a12a8d278d76e1"
+    },
+    "review_bytes_changed": false,
+    "scope": "Four unchanged self-contained remote workflows. Its Skill scope is distinct from the shared endpoint tool catalog; no vendor acceptance is inferred."
+  },
+  "requires_imported_skill_update": [
+    {
+      "source_skill": "skills/ohmyhost-manage-database/SKILL.md",
+      "source_line": 184,
+      "old_tool": "promotion_execute",
+      "remote_tool": "deployment_promote",
+      "reason": "The unqualified uploaded alias must distinguish local and remote execution tools."
+    },
+    {
+      "source_skill": "skills/ohmyhost-troubleshoot-deployment/SKILL.md",
+      "source_line": 10,
+      "old_tool": "operation_logs",
+      "remote_tool": "operation_get",
+      "reason": "The local bounded event collector uses a streaming route; remote work follows bounded operation/deployment observations."
+    },
+    {
+      "source_skill": "skills/ohmyhost-domains-and-mail/SKILL.md",
+      "source_line": 110,
+      "old_tool": "mail_webhook_set",
+      "remote_tool": null,
+      "reason": "Preparation returns a server signing credential; updated instructions must explain private custody rather than imply remote availability."
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "name": "@ohmyhost/webhook-ingress",
+  "version": "0.0.0",
+  "private": true,
+  "ohmyhost": {
+    "deployment": "production",
+    "fakeProviderBoundary": {
+      "typescriptProject": "tsconfig.build.json",
+      "artifactRoot": "dist",
+      "entrypoints": [
+        "src/index.ts",
+        "src/worker-main.ts"
+      ],
+      "bundles": []
+    }
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "boundary": "pnpm --filter @ohmyhost/webhook-ingress... build && node scripts/check-import-boundary.mjs",
+    "build": "tsc --project tsconfig.build.json",
+    "coverage": "vitest run --root ../.. apps/webhook-ingress/test --coverage --coverage.include='apps/webhook-ingress/src/**/*.ts' --coverage.reporter=text --coverage.reporter=json-summary",
+    "deploy:dry-run": "wrangler deploy --dry-run",
+    "test": "vitest run --root ../.. apps/webhook-ingress/test",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo"
+  },
+  "dependencies": {
+    "@ohmyhost/database": "workspace:*",
+    "@ohmyhost/platform": "workspace:*",
+    "@ohmyhost/provider-github": "workspace:*",
+    "@ohmyhost/provider-stripe": "workspace:*",
+    "@ohmyhost/workos-auth-contracts": "workspace:*",
+    "hono": "4.13.18",
+    "@ohmyhost/provider-resend": "workspace:*"
+  },
+  "devDependencies": {
+    "wrangler": "4.124.0"
+  }
+}

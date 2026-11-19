@@ -1,0 +1,10 @@
+CREATE TABLE growth_usage_records (seq INTEGER PRIMARY KEY AUTOINCREMENT, record_id TEXT NOT NULL UNIQUE, subject_key TEXT NOT NULL, received_day TEXT NOT NULL, body TEXT NOT NULL);
+CREATE INDEX growth_usage_records_page ON growth_usage_records(subject_key,received_day,seq);
+CREATE TABLE growth_usage_receipts (record_id TEXT PRIMARY KEY, subject_key TEXT NOT NULL, body_hash TEXT NOT NULL, received_at TEXT NOT NULL);
+CREATE INDEX growth_usage_receipts_subject ON growth_usage_receipts(subject_key);
+CREATE TABLE growth_usage_archive_index (object_key TEXT PRIMARY KEY, subject_key TEXT NOT NULL, received_day TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE INDEX growth_usage_archive_subject ON growth_usage_archive_index(subject_key,received_day);
+CREATE TABLE growth_usage_export (singleton INTEGER PRIMARY KEY CHECK(singleton=1), cutoff_seq INTEGER, completed_at TEXT, last_attempt_at TEXT, last_error TEXT);
+INSERT INTO growth_usage_export(singleton) VALUES(1);
+CREATE TABLE growth_usage_erasure (subject_key TEXT PRIMARY KEY, not_before TEXT NOT NULL, completed_at TEXT);
+INSERT INTO growth_usage_erasure(subject_key,not_before) SELECT subject_key,strftime('%Y-%m-%dT%H:%M:%fZ','now','+1 hour') FROM growth_subject_suppression;

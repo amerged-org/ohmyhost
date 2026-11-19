@@ -1,0 +1,5 @@
+* text=auto eol=lf
+apps/project-provisioning-worker/worker-configuration.d.ts whitespace=-trailing-space
+
+# Preserve exact historical bundled gallery bytes from source61.
+docs/plan/history/snapshots/2026-11-08-preview-parked/gallery.html -whitespace

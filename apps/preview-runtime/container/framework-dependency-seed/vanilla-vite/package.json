@@ -1,0 +1,15 @@
+{
+  "name": "supwer-warp-interest",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.2",
+  "dependencies": {
+    "@ohmyhost/customer-runtime": "npm:@amerged/ohmyhost-runtime@0.1.53"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.0",
+    "typescript": "5.9.2",
+    "vite": "8.3.4"
+  }
+}

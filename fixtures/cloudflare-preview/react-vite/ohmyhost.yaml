@@ -1,0 +1,16 @@
+version: 1
+project: preview-react-vite
+build:
+  install: pnpm install --frozen-lockfile --ignore-scripts
+  command: pnpm run build
+  output: dist
+runtime:
+  mode: edge
+  healthcheck: /api/health
+database:
+  enabled: true
+  migrations: db/migrations
+auth:
+  provider: none
+mail:
+  enabled: false

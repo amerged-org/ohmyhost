@@ -1,0 +1,22 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-control-store",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-08-24",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": false },
+  // The shared core is the ONE authority database of the environment (layout shared-core-v1): the Directory, every
+  // mutable Control catalog and the finance ledger. The release pipeline binds the exact operator-verified resource:
+  // the fixed-name EU target or the retained UUID-named EU profile. Its id is never checked in. There is no second authority: the store
+  // refuses a Worker that binds CONTROL_GLOBAL or CONTROL_SHARD_nnnn next to it.
+  "d1_databases": [
+    {
+      "binding": "CONTROL_CORE",
+      "database_name": "ohmyho-control-core",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations/core",
+    },
+  ],
+}

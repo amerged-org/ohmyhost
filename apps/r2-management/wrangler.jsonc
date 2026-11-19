@@ -1,0 +1,16 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-r2-management",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-08-24",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": false },
+  "vars": {
+    "RUNTIME_CONFIGURATION_STATE": "disabled",
+    "CLOUDFLARE_ACCOUNT_ID": "00000000000000000000000000000000",
+  },
+  // CLOUDFLARE_R2_API_TOKEN is a Worker secret with Workers R2 Storage Write only.
+  // CLOUDFLARE_R2_ANALYTICS_TOKEN is a separate Account Analytics Read secret.
+}

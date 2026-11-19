@@ -1,0 +1,5 @@
+---
+import Counter from "../components/Counter";
+const value = new URL(Astro.request.url).searchParams.get('name') ?? 'Astro';
+---
+<!doctype html><html lang="en"><head><meta charset="utf-8"/><title>Astro hosting fixture</title></head><body><h1>Hello {value}</h1><Counter client:load /></body></html>

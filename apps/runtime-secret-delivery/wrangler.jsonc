@@ -1,0 +1,21 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-runtime-secret-delivery",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-08-21",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": {
+    "RUNTIME_CONFIGURATION_STATE": "disabled",
+    "ENVIRONMENT_SECRET_KEY_VERSION": "2",
+  },
+  "services": [
+    {
+      "binding": "WFP_MANAGEMENT",
+      "service": "ohmyho-wfp-management-sandbox",
+      "entrypoint": "WfpManagementService",
+    },
+  ],
+  "triggers": { "crons": ["*/1 * * * *"] },
+}

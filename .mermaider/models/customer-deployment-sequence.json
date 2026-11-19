@@ -1,0 +1,351 @@
+{
+  "version": 1,
+  "review": "reviewed",
+  "diagram": {
+    "id": "customer-deployment-sequence",
+    "title": "Customer deployment — successful fresh-build sequence",
+    "family": "process",
+    "syntax": "sequence",
+    "provenance": "curated",
+    "context": "implemented",
+    "nodes": [
+      {
+        "id": "01_workflow",
+        "label": "Deployment workflow",
+        "evidence": [
+          {
+            "line": 814,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "b3b3a5448072b910cf02e8394153358aaba446d112c5d3cb912f49d7816806e3",
+            "symbol": "runDeployment"
+          }
+        ]
+      },
+      {
+        "id": "02_source",
+        "label": "Source port",
+        "evidence": [
+          {
+            "line": 814,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "b3b3a5448072b910cf02e8394153358aaba446d112c5d3cb912f49d7816806e3",
+            "symbol": "runDeployment"
+          }
+        ]
+      },
+      {
+        "id": "03_build",
+        "label": "Build port",
+        "evidence": [
+          {
+            "line": 814,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "b3b3a5448072b910cf02e8394153358aaba446d112c5d3cb912f49d7816806e3",
+            "symbol": "runDeployment"
+          }
+        ]
+      },
+      {
+        "id": "04_database",
+        "label": "Selected application-provider resources",
+        "evidence": [
+          {
+            "line": 814,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "b3b3a5448072b910cf02e8394153358aaba446d112c5d3cb912f49d7816806e3",
+            "symbol": "runDeployment"
+          }
+        ]
+      },
+      {
+        "id": "05_wfp",
+        "label": "WFP port",
+        "evidence": [
+          {
+            "line": 1230,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "8638f7c6459e1bf371147010f1ac84c4e5956be1f1af3200de7dae2f66fa1e89",
+            "symbol": "activateWfpCandidate"
+          }
+        ]
+      },
+      {
+        "id": "06_control",
+        "label": "Core D1 Control persistence",
+        "evidence": [
+          {
+            "line": 1230,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "8638f7c6459e1bf371147010f1ac84c4e5956be1f1af3200de7dae2f66fa1e89",
+            "symbol": "activateWfpCandidate"
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "steps": [
+      {
+        "from": "01_workflow",
+        "to": "03_build",
+        "label": "Read binding refresh; none for this path",
+        "kind": "message",
+        "evidence": [
+          {
+            "line": 814,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "b3b3a5448072b910cf02e8394153358aaba446d112c5d3cb912f49d7816806e3",
+            "symbol": "runDeployment"
+          }
+        ]
+      },
+      {
+        "from": "01_workflow",
+        "to": "02_source",
+        "label": "Fetch exact accepted archive",
+        "kind": "message",
+        "evidence": [
+          {
+            "line": 814,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "b3b3a5448072b910cf02e8394153358aaba446d112c5d3cb912f49d7816806e3",
+            "symbol": "runDeployment"
+          }
+        ]
+      },
+      {
+        "from": "02_source",
+        "to": "01_workflow",
+        "label": "Observed archive",
+        "kind": "reply",
+        "evidence": [
+          {
+            "line": 814,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "b3b3a5448072b910cf02e8394153358aaba446d112c5d3cb912f49d7816806e3",
+            "symbol": "runDeployment"
+          }
+        ]
+      },
+      {
+        "from": "01_workflow",
+        "to": "03_build",
+        "label": "Start isolated build",
+        "kind": "message",
+        "evidence": [
+          {
+            "line": 814,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "b3b3a5448072b910cf02e8394153358aaba446d112c5d3cb912f49d7816806e3",
+            "symbol": "runDeployment"
+          }
+        ]
+      },
+      {
+        "from": "01_workflow",
+        "to": "03_build",
+        "label": "Poll build with bounded waits",
+        "kind": "message",
+        "evidence": [
+          {
+            "line": 814,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "b3b3a5448072b910cf02e8394153358aaba446d112c5d3cb912f49d7816806e3",
+            "symbol": "runDeployment"
+          }
+        ]
+      },
+      {
+        "from": "03_build",
+        "to": "01_workflow",
+        "label": "Observed artifact and digest",
+        "kind": "reply",
+        "evidence": [
+          {
+            "line": 814,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "b3b3a5448072b910cf02e8394153358aaba446d112c5d3cb912f49d7816806e3",
+            "symbol": "runDeployment"
+          }
+        ]
+      },
+      {
+        "from": "01_workflow",
+        "to": "04_database",
+        "label": "Ensure resources; optional Native admission; bounded mail and database waits",
+        "kind": "message",
+        "evidence": [
+          {
+            "line": 814,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "b3b3a5448072b910cf02e8394153358aaba446d112c5d3cb912f49d7816806e3",
+            "symbol": "runDeployment"
+          },
+          {
+            "line": 161,
+            "path": "apps/control-store/src/catalog/identity/native-auth-resource-operations.ts",
+            "sha256": "26ca39f17a5576b437de6d8423bab1c2d3a637a9b6b99d14048c66d88ae52b51",
+            "symbol": "resolveNativeAuthDatabaseClaim"
+          }
+        ]
+      },
+      {
+        "from": "04_database",
+        "to": "01_workflow",
+        "label": "Resources ready",
+        "kind": "reply",
+        "evidence": [
+          {
+            "line": 814,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "b3b3a5448072b910cf02e8394153358aaba446d112c5d3cb912f49d7816806e3",
+            "symbol": "runDeployment"
+          }
+        ]
+      },
+      {
+        "from": "01_workflow",
+        "to": "05_wfp",
+        "label": "Stage immutable candidate",
+        "kind": "message",
+        "evidence": [
+          {
+            "line": 1230,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "8638f7c6459e1bf371147010f1ac84c4e5956be1f1af3200de7dae2f66fa1e89",
+            "symbol": "activateWfpCandidate"
+          }
+        ]
+      },
+      {
+        "from": "01_workflow",
+        "to": "06_control",
+        "label": "Persist candidate evidence",
+        "kind": "message",
+        "evidence": [
+          {
+            "line": 1230,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "8638f7c6459e1bf371147010f1ac84c4e5956be1f1af3200de7dae2f66fa1e89",
+            "symbol": "activateWfpCandidate"
+          }
+        ]
+      },
+      {
+        "from": "01_workflow",
+        "to": "05_wfp",
+        "label": "Record runtime-secret candidate stage",
+        "kind": "message",
+        "evidence": [
+          {
+            "line": 1230,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "8638f7c6459e1bf371147010f1ac84c4e5956be1f1af3200de7dae2f66fa1e89",
+            "symbol": "activateWfpCandidate"
+          }
+        ]
+      },
+      {
+        "from": "01_workflow",
+        "to": "06_control",
+        "label": "Authorize activation and target Native launch policy",
+        "kind": "message",
+        "evidence": [
+          {
+            "line": 1230,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "8638f7c6459e1bf371147010f1ac84c4e5956be1f1af3200de7dae2f66fa1e89",
+            "symbol": "activateWfpCandidate"
+          },
+          {
+            "line": 25,
+            "path": "apps/control-store/src/catalog/provisioning/deployment-authorization.ts",
+            "sha256": "45c12e5545eba21025a1092ea337f06d8ae5e235813e7f4535f8bc9044742fc6",
+            "symbol": "authorize"
+          }
+        ]
+      },
+      {
+        "from": "01_workflow",
+        "to": "05_wfp",
+        "label": "Activate gateway candidate",
+        "kind": "message",
+        "evidence": [
+          {
+            "line": 1230,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "8638f7c6459e1bf371147010f1ac84c4e5956be1f1af3200de7dae2f66fa1e89",
+            "symbol": "activateWfpCandidate"
+          }
+        ]
+      },
+      {
+        "from": "01_workflow",
+        "to": "06_control",
+        "label": "Recheck authorization and Native launch policy",
+        "kind": "message",
+        "evidence": [
+          {
+            "line": 1230,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "8638f7c6459e1bf371147010f1ac84c4e5956be1f1af3200de7dae2f66fa1e89",
+            "symbol": "activateWfpCandidate"
+          },
+          {
+            "line": 25,
+            "path": "apps/control-store/src/catalog/provisioning/deployment-authorization.ts",
+            "sha256": "45c12e5545eba21025a1092ea337f06d8ae5e235813e7f4535f8bc9044742fc6",
+            "symbol": "authorize"
+          },
+          {
+            "line": 160,
+            "path": "apps/control-store/src/catalog/provisioning/deployment-finalization.ts",
+            "sha256": "a868de80eeacaa2a82bfe5d9d0c78476470c7f13f0718ee3fa5c74d9d38e071a",
+            "symbol": "finalizeProductCandidate"
+          }
+        ]
+      },
+      {
+        "from": "01_workflow",
+        "to": "05_wfp",
+        "label": "Record runtime-secret activation",
+        "kind": "message",
+        "evidence": [
+          {
+            "line": 1230,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "8638f7c6459e1bf371147010f1ac84c4e5956be1f1af3200de7dae2f66fa1e89",
+            "symbol": "activateWfpCandidate"
+          }
+        ]
+      },
+      {
+        "from": "01_workflow",
+        "to": "06_control",
+        "label": "Finalize candidate evidence",
+        "kind": "message",
+        "evidence": [
+          {
+            "line": 1230,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "8638f7c6459e1bf371147010f1ac84c4e5956be1f1af3200de7dae2f66fa1e89",
+            "symbol": "activateWfpCandidate"
+          }
+        ]
+      },
+      {
+        "from": "06_control",
+        "to": "01_workflow",
+        "label": "Applied or duplicate persistence; succeeded",
+        "kind": "reply",
+        "evidence": [
+          {
+            "line": 1230,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "8638f7c6459e1bf371147010f1ac84c4e5956be1f1af3200de7dae2f66fa1e89",
+            "symbol": "activateWfpCandidate"
+          }
+        ]
+      }
+    ]
+  }
+}

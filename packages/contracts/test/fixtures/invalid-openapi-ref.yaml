@@ -1,0 +1,14 @@
+openapi: 3.1.2
+info:
+  title: Broken contract fixture
+  version: 0.0.0
+paths:
+  /health:
+    get:
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DoesNotExist"

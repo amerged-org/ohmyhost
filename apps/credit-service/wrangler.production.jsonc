@@ -1,0 +1,52 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-credit-service-production",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+  },
+  // Usage passes at minutes 27 and 57 (the first bills what the provider finalized, the second retries) and the credit-log rotation at 00:00 UTC; scheduled() dispatches on the cron text, so USAGE_CRON and ROTATION_CRON in src/worker-main.ts must equal these strings.
+  "triggers": {
+    "crons": ["27,57 * * * *", "0 0 * * *"],
+  },
+  // The Credit Service reaches the environment's Core only through the CREDIT_RUNTIME service binding and
+  // holds no database credential. The Core database id is a placeholder here; the release train resolves it from its
+  // Core step.
+  "vars": {
+    "CONTROL_CORE_DATABASE_ID": "00000000-0000-0000-0000-000000000000",
+    "CREDIT_ENVIRONMENT": "production",
+    "WFP_USAGE_NAMESPACE": "ohmyho-production",
+  },
+  "account_id": "00000000000000000000000000000001",
+  // USAGE_LOGS is the Logpush bucket (read only in code); CREDIT_LOG holds the rotated credit log for 14 days.
+  "r2_buckets": [
+    { "binding": "USAGE_LOGS", "bucket_name": "ohmyho-usage-production", "jurisdiction": "eu" },
+    {
+      "binding": "CREDIT_LOG",
+      "bucket_name": "ohmyho-credit-log-production",
+      "jurisdiction": "eu",
+    },
+  ],
+  "services": [
+    {
+      "binding": "CREDIT_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "CreditRuntime",
+    },
+    {
+      "binding": "NEON_USAGE",
+      "service": "ohmyho-neon-management-production",
+      "entrypoint": "NeonUsageService",
+    },
+    {
+      "binding": "R2_USAGE",
+      "service": "ohmyho-r2-management-production",
+      "entrypoint": "R2ManagementService",
+    },
+  ],
+}

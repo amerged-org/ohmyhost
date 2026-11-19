@@ -1,0 +1,19 @@
+{
+  "organization": {
+    "id": "org_fixture",
+    "name": "Fixture Organization",
+    "created_at": "2026-01-01T00:00:00.000Z",
+    "updated_at": "2026-08-18T10:00:00.000Z"
+  },
+  "memberships": [
+    {
+      "id": "om_fixture",
+      "user_id": "user_fixture",
+      "organization_id": "org_fixture",
+      "status": "active",
+      "roles": [{ "slug": "member" }],
+      "created_at": "2026-01-01T00:00:00.000Z",
+      "updated_at": "2026-08-18T10:00:00.000Z"
+    }
+  ]
+}

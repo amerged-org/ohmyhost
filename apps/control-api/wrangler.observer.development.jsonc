@@ -1,0 +1,242 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-control-api-poc-private-fullstack",
+  "account_id": "00000000000000000000000000000001",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-08-19",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "triggers": { "crons": ["* * * * *"] },
+  "secrets": {
+    "required": ["ENVIRONMENT_SECRET_KEY_BASE64", "ENVIRONMENT_SECRET_ADDITIONAL_KEYS_JSON"],
+  },
+  "vars": {
+    "WORKOS_CONNECT_ISSUER": "https://orderly-laugh-73-staging.authkit.app",
+    "WORKOS_CONNECT_JWKS_URL": "https://orderly-laugh-73-staging.authkit.app/oauth2/jwks",
+    "MANAGED_ARTIFACTS_NAMESPACE_US": "ohmyhost-development-us",
+    "MANAGED_ARTIFACTS_NAMESPACE_EU": "ohmyhost-development-eu",
+    "BROWSER_LOGIN_ENABLED": "true",
+    "CONTROL_API_PUBLIC_ORIGIN": "https://dev.app.ohmyho.st",
+    "ENVIRONMENT_SECRET_KEY_VERSION": "20261106",
+    "WORKOS_AUDIENCE": "control-api",
+    "WORKOS_CLIENT_ID": "client_00000000000000000000000017",
+    "WORKOS_ISSUER": "https://api.workos.com/user_management/client_00000000000000000000000017",
+    "WORKOS_JWKS_URL": "https://api.workos.com/sso/jwks/client_00000000000000000000000017",
+  },
+  "services": [
+    {
+      "binding": "PREVIEW_API_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "ProductApiPreviewRuntime",
+    },
+    {
+      "binding": "PREVIEW_EXECUTION",
+      "service": "ohmyho-live-preview-poc-private-fullstack",
+      "entrypoint": "PreviewExecution",
+    },
+    {
+      "binding": "GROWTH_ANALYTICS",
+      "service": "ohmyho-growth-analytics-poc-private-fullstack",
+      "entrypoint": "GrowthCollectRuntime",
+    },
+    {
+      "binding": "NATIVE_AUTH_PROVIDER_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "NativeAuthRuntime",
+    },
+    {
+      "binding": "NATIVE_AUTH_ADMIN_US",
+      "service": "ohmyho-native-auth-development-us",
+      "entrypoint": "NativeAdminService",
+    },
+    {
+      "binding": "NATIVE_AUTH_ADMIN_EU",
+      "service": "ohmyho-native-auth-development-eu",
+      "entrypoint": "NativeAdminService",
+    },
+    {
+      "binding": "CONTROL_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "ControlRuntime",
+    },
+    {
+      "binding": "ACCOUNT_METADATA_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "AccountMetadataRuntime",
+    },
+    {
+      "binding": "CONTROL_MAINTENANCE_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "MaintenanceRuntime",
+    },
+    {
+      "binding": "PUBLIC_ENTRY_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "PublicEntryRuntime",
+    },
+    {
+      "binding": "PUBLIC_ENTRY_RETENTION_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "PublicEntryRetentionRuntime",
+    },
+    {
+      "binding": "CUSTOMER_FEEDBACK_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "CustomerFeedbackRuntime",
+    },
+    {
+      "binding": "PUBLIC_CREDIT_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "PublicCreditRuntime",
+    },
+    {
+      "binding": "PRODUCT_API_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "ProductApiRuntime",
+    },
+    {
+      "binding": "MANAGED_SOURCE_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "ManagedSourceRuntime",
+    },
+    {
+      "binding": "DEV_ACCESS_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "DevAccessRuntime",
+    },
+    {
+      "binding": "MAIL_MANAGEMENT_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "MailManagementRuntime",
+    },
+    {
+      "binding": "SHARED_MAIL_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "SharedMailRuntime",
+    },
+    {
+      "binding": "GITHUB_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "GithubRuntime",
+    },
+    {
+      "binding": "DATABASE_PRODUCT_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "DatabaseProductRuntime",
+    },
+    {
+      "binding": "GATEWAY_LOOKUP_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "GatewayLookupRuntime",
+    },
+    {
+      "binding": "GATEWAY_MANAGEMENT_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "GatewayManagementRuntime",
+    },
+    {
+      "binding": "RUNTIME_PROBE_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "RuntimeProbeRuntime",
+    },
+    {
+      "binding": "GATEWAY_CREDIT_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "GatewayCreditRuntime",
+    },
+    {
+      "binding": "MAIL_DELIVERY",
+      "service": "ohmyho-mail-gateway-poc-private-fullstack",
+      "entrypoint": "ResendMailDeliveryService",
+    },
+    {
+      "binding": "OPERATION_PUBLISHER",
+      "service": "ohmyho-project-provisioning-publisher-poc-private-fullstack",
+      "entrypoint": "OperationPublisherService",
+    },
+    {
+      "binding": "MAIL_DOMAIN_OBSERVER",
+      "service": "ohmyho-ses-management-poc-private-fullstack",
+      "entrypoint": "ResendMailManagementService",
+    },
+    {
+      "binding": "RECOVERY_SERVICE",
+      "service": "ohmyho-recovery-container-poc-private-fullstack",
+      "entrypoint": "RecoveryContainerService",
+    },
+    {
+      "binding": "BILLING",
+      "service": "ohmyho-billing-poc-private-fullstack",
+    },
+    {
+      "binding": "AUTH_STATUS",
+      "service": "ohmyhost-workos-management-poc-private-fullstack",
+    },
+    {
+      "binding": "WORKOS_WEBHOOK_INGRESS",
+      "service": "ohmyho-workos-webhook-poc-private-fullstack",
+    },
+    {
+      "binding": "GITHUB_WEBHOOK_INGRESS",
+      "service": "ohmyho-workos-webhook-poc-private-fullstack",
+    },
+    {
+      "binding": "SOURCE_INSPECTOR",
+      "service": "ohmyho-source-fetcher-poc-private-fullstack",
+      "entrypoint": "SourceFetcherService",
+    },
+    {
+      "binding": "PROVIDER_RECONCILIATION",
+      "service": "ohmyho-deployment-workflow-poc-private-fullstack",
+      "entrypoint": "ProductProviderReconciliationService",
+    },
+    {
+      "binding": "NEON_MANAGEMENT",
+      "service": "ohmyho-neon-management-poc-private-fullstack",
+      "entrypoint": "NeonManagementService",
+    },
+    {
+      "binding": "CLOUDFLARE_DOMAIN_MANAGEMENT",
+      "service": "ohmyho-cloudflare-domain-management-poc-private-fullstack",
+      "entrypoint": "CloudflareDomainManagementService",
+    },
+    {
+      "binding": "CREDIT_SERVICE",
+      "service": "ohmyho-credit-service-poc-private-fullstack",
+      "entrypoint": "CreditServiceRuntime",
+    },
+  ],
+  "ratelimits": [
+    {
+      "name": "PUBLIC_ENTRY_RATE_LIMITER",
+      "namespace_id": "2002",
+      "simple": { "limit": 20, "period": 60 },
+    },
+    {
+      "name": "CONTROL_API_RATE_LIMITER",
+      "namespace_id": "2001",
+      "simple": {
+        "limit": 1200,
+        "period": 60,
+      },
+    },
+  ],
+  "routes": [{ "pattern": "dev.app.ohmyho.st", "custom_domain": true }],
+  "tail_consumers": [{ "service": "ohmyho-diagnostic-tail-poc-private-fullstack" }],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": false,
+      "persist": true,
+    },
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "GROWTH_HEALTH", "class_name": "GrowthTelemetryHealth" }],
+  },
+  "migrations": [{ "tag": "growth-health-v1", "new_sqlite_classes": ["GrowthTelemetryHealth"] }],
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
+}

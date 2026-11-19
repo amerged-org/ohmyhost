@@ -1,0 +1,15 @@
+**
+!apps/build-runner/sandbox/build-runtime.mjs
+!packages/contracts/src/framework-build-script.mjs
+!packages/contracts/src/browser-capabilities.ts
+!packages/contracts/src/customer-auth-admission.ts
+!packages/contracts/src/egress-origin.ts
+!packages/customer-runtime/src/preview-transport.ts
+!apps/preview-runtime/container/source-write.c
+!apps/preview-runtime/container/drivers.mjs
+!apps/preview-runtime/container/protocol.mjs
+!apps/preview-runtime/container/bindings-worker.mjs
+!apps/preview-runtime/container/native-loader.mjs
+!apps/preview-runtime/container/prepare.mjs
+!apps/preview-runtime/container/serve.mjs
+!apps/preview-runtime/container/framework-dependency-seed/**

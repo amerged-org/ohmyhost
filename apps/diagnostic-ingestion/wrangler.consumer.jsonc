@@ -1,0 +1,23 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-diagnostic-consumer",
+  "main": "src/consumer-main.ts",
+  "compatibility_date": "2026-08-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": false },
+  "vars": { "RUNTIME_CONFIGURATION_STATE": "disabled", "DIAGNOSTIC_PRODUCER_ID": "disabled" },
+  "triggers": { "crons": ["17 * * * *"] },
+  "queues": {
+    "consumers": [
+      {
+        "queue": "ohmyho-diagnostics",
+        "max_batch_size": 50,
+        "max_batch_timeout": 5,
+        "max_retries": 3,
+        "dead_letter_queue": "ohmyho-diagnostics-dlq",
+      },
+    ],
+  },
+}

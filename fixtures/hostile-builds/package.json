@@ -1,0 +1,14 @@
+{
+  "name": "ohmyhost-fixture-hostile-vite-shape",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.2",
+  "scripts": {
+    "preinstall": "node marker.mjs preinstall",
+    "build": "node marker.mjs build && vite build"
+  },
+  "devDependencies": {
+    "vite": "7.3.6"
+  }
+}

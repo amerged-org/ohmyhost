@@ -1,0 +1,59 @@
+erDiagram
+    n_f3196b0ce589["credit_reservation"] {
+        INTEGER amount_micros
+        TEXT created_at
+        TEXT organization_id
+        TEXT project_id
+        TEXT reservation_id PK
+    }
+    n_2275ac6517a5["credit_log"] {
+        TEXT at
+        INTEGER balance_micros
+        INTEGER delta_micros
+        TEXT detail
+        TEXT key UK
+        TEXT kind
+        TEXT organization_id
+        INTEGER seq PK
+    }
+    n_cd3ec5043020["usage_cursor"] {
+        TEXT source PK
+        TEXT through
+    }
+    n_be45bf7e3c8d["credit_account"] {
+        TEXT exhausted_at
+        TEXT granted_captured_at
+        TEXT granted_source
+        TEXT granted_until
+        TEXT monthly_ends_at
+        INTEGER monthly_micros
+        INTEGER onetime_micros
+        TEXT organization_id PK
+        INTEGER overrun_base_micros
+        INTEGER overrun_micros
+        TEXT paid_renewal_at
+        TEXT paid_source
+        TEXT paid_subscription_id
+        TEXT paid_until
+        INTEGER reserved_micros
+        TEXT updated_at
+        TEXT warned_for_exhausted_at
+        TEXT warning_next_attempt_at
+    }
+    n_726c3dc9ba73["project_credit"] {
+        INTEGER budget_micros
+        TEXT budget_mode
+        TEXT organization_id
+        TEXT period
+        TEXT project_id PK
+        INTEGER used_micros
+    }
+    n_ee7ab8c23026["credit_grant"] {
+        INTEGER amount_micros
+        TEXT covers_until
+        TEXT granted_at
+        TEXT key PK
+        TEXT organization_id
+        INTEGER paid_minor
+        INTEGER reversed_micros
+    }

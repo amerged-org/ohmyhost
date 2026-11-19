@@ -1,0 +1,23 @@
+{
+  "name": "ohmyhost-astro-edge-fixture",
+  "private": true,
+  "type": "module",
+  "packageManager": "npm@11.5.1",
+  "dependencies": {
+    "astro": "7.4.0",
+    "@astrojs/cloudflare": "14.4.0",
+    "@astrojs/react": "7.1.0",
+    "react": "19.2.5",
+    "react-dom": "19.2.5",
+    "oxc-transform-react": "0.145.0",
+    "@ohmyhost/customer-runtime": "npm:@amerged/ohmyhost-runtime@0.1.53"
+  },
+  "overrides": {
+    "@astrojs/react": {
+      "@vitejs/plugin-react": "6.1.1"
+    },
+    "miniflare": {
+      "undici": "7.30.1"
+    }
+  }
+}

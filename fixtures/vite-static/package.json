@@ -1,0 +1,13 @@
+{
+  "name": "ohmyhost-fixture-vite-static",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.2",
+  "scripts": {
+    "build": "vite build"
+  },
+  "devDependencies": {
+    "vite": "7.3.6"
+  }
+}

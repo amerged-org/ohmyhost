@@ -1,0 +1,12 @@
+version: 1
+project: next-edge
+build:
+  install: pnpm install --frozen-lockfile --ignore-scripts
+  command: pnpm run build
+  output: .next
+runtime:
+  mode: edge
+database:
+  enabled: false
+mail:
+  enabled: false

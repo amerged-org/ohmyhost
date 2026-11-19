@@ -1,0 +1,40 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-credit-service-local",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+  },
+  // Usage passes at minutes 27 and 57 (the first bills what the provider finalized, the second retries) and the credit-log rotation at 00:00 UTC; scheduled() dispatches on the cron text, so USAGE_CRON and ROTATION_CRON in src/worker-main.ts must equal these strings.
+  "triggers": {
+    "crons": ["27,57 * * * *", "0 0 * * *"],
+  },
+  "vars": {
+    "CREDIT_ENVIRONMENT": "local",
+    "WFP_USAGE_NAMESPACE": "ohmyho-local",
+  },
+  // USAGE_LOGS is the Logpush bucket (read only in code); CREDIT_LOG holds the rotated credit log for 14 days.
+  "r2_buckets": [
+    { "binding": "USAGE_LOGS", "bucket_name": "ohmyho-usage-local", "jurisdiction": "eu" },
+    { "binding": "CREDIT_LOG", "bucket_name": "ohmyho-credit-log-local", "jurisdiction": "eu" },
+  ],
+  // The local profile only proves that the Worker bundles; the Core binding CREDIT_RUNTIME exists in the Dev and
+  // Production profiles, which bind their own environment's Core.
+  "services": [
+    {
+      "binding": "NEON_USAGE",
+      "service": "ohmyho-neon-management",
+      "entrypoint": "NeonUsageService",
+    },
+    {
+      "binding": "R2_USAGE",
+      "service": "ohmyho-r2-management",
+      "entrypoint": "R2ManagementService",
+    },
+  ],
+}

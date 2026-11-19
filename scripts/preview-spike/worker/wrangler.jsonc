@@ -1,0 +1,75 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-preview-spike-development",
+  "account_id": "00000000000000000000000000000001",
+  "main": "./index.mjs",
+  "compatibility_date": "2026-11-11",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "version_metadata": { "binding": "CF_VERSION_METADATA" },
+  "vars": { "SPIKE_PREVIEW_DOMAIN": "preview.dev.omh.st", "SPIKE_QA_ENABLED": "development" },
+  "services": [
+    {
+      "binding": "QA_DEV_ACCESS",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "DevAccessRuntime",
+    },
+    {
+      "binding": "QA_CREDIT",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "GatewayCreditRuntime",
+    },
+    {
+      "binding": "QA_DATABASE_AUTHORITY",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "PreviewQaDatabaseAuthority",
+    },
+    {
+      "binding": "QA_SCOPED_DATABASE",
+      "service": "ohmyho-project-database-development-eu",
+      "entrypoint": "ProjectDatabaseQa",
+    },
+    {
+      "binding": "QA_STABLE_PREVIEW_MANAGEMENT",
+      "service": "ohmyho-preview-spike-auth-development",
+      "entrypoint": "QaStablePreviewManagement",
+    },
+    {
+      "binding": "QA_STABLE_PREVIEW_AUTHORITY",
+      "service": "ohmyho-preview-spike-auth-development",
+      "entrypoint": "QaStablePreviewAuthority",
+    },
+    {
+      "binding": "QA_NATIVE_STABLE_PREVIEW",
+      "service": "ohmyho-native-auth-development-eu",
+      "entrypoint": "NativePreviewService",
+    },
+    {
+      "binding": "QA_MAIL_PRIVATE",
+      "service": "ohmyho-preview-spike-mail-development",
+      "entrypoint": "QaMailPrivate",
+    },
+  ],
+  "routes": [
+    { "pattern": "*.preview.dev.omh.st/*", "zone_id": "0000000000000000000000000000000b" },
+  ],
+  "r2_buckets": [
+    { "binding": "BACKUP_BUCKET", "bucket_name": "ohmyho-preview-spike-backups-development" },
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "SANDBOX", "class_name": "PreviewSpike" },
+      { "name": "SPIKE_LIMIT", "class_name": "SpikeLimit" },
+    ],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["PreviewSpike", "SpikeLimit"] }],
+  "containers": [
+    {
+      "name": "ohmyho-preview-spike-development",
+      "class_name": "PreviewSpike",
+      "scheduling_policy": "durable_object",
+      "images": { "fixture": { "dockerfile": "./Dockerfile", "build_context": "./build-context" } },
+    },
+  ],
+}

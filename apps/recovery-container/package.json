@@ -1,0 +1,37 @@
+{
+  "name": "@ohmyhost/recovery-container",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "ohmyhost": {
+    "deployment": "production",
+    "fakeProviderBoundary": {
+      "typescriptProject": "tsconfig.build.json",
+      "artifactRoot": "dist",
+      "entrypoints": [
+        "src/worker-main.ts"
+      ],
+      "bundles": [
+        {
+          "entrypoint": "src/worker-main.ts",
+          "metafile": "dist/worker-bundle/metafile.json"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json && wrangler deploy --dry-run --containers-rollout none --outdir dist/worker-bundle --metafile dist/worker-bundle/metafile.json --config wrangler.jsonc",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo",
+    "test": "vitest run --root ../.. apps/recovery-container/test"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "0.3.7",
+    "@ohmyhost/platform": "workspace:*",
+    "@ohmyhost/project-recovery-worker": "workspace:*"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "miniflare": "4.20260730.0",
+    "wrangler": "4.125.0"
+  }
+}

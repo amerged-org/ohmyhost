@@ -1,0 +1,9 @@
+version: 1
+project: native-auth-canary
+build:
+  install: pnpm install --frozen-lockfile --ignore-scripts
+runtime:
+  mode: functions
+  healthcheck: /health
+auth:
+  provider: omh-native

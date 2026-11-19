@@ -1,0 +1,30 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-project-provisioning-publisher-poc-private-fullstack",
+  "account_id": "00000000000000000000000000000001",
+  "main": "src/publisher-main.ts",
+  "compatibility_date": "2026-08-19",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "vars": {
+    "RUNTIME_CONFIGURATION_STATE": "configured",
+  },
+  "queues": {
+    "producers": [
+      {
+        "binding": "PROJECT_PROVISIONING_QUEUE",
+        "queue": "ohmyho-project-provisioning-poc-private-fullstack",
+      },
+    ],
+  },
+  "triggers": { "crons": ["*/1 * * * *"] },
+  "services": [
+    {
+      "binding": "PROJECT_DISPATCH_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "ProjectDispatchRuntime",
+    },
+  ],
+}

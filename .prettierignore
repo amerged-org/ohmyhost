@@ -1,0 +1,77 @@
+docs/plan/evidence/legacy/
+# Retain the bytes of previously published acceptance receipts.
+docs/plan/evidence/P27/compute-idle-policy-candidate-20260912.json
+docs/plan/evidence/P27/performance-compute-live-20260912.json
+docs/plan/evidence/P30/minimal-portal-20260913.json
+docs/plan/evidence/P30/privacy-contact-20260913.json
+docs/plan/evidence/P30/user-key-lifecycle-candidate-20260912.json
+docs/plan/evidence/P30/user-key-lifecycle-live-20260912.json
+.turbo/
+**/.terraform/
+**/.wrangler/
+# Astro generates these fixture outputs during framework verification.
+fixtures/astro-edge/.astro/
+fixtures/astro-static/.astro/
+fixtures/astro-edge/.ohmyhost-astro-wrangler.jsonc
+coverage/
+dist/
+packages/contracts/generated/openapi.json
+apps/project-provisioning-worker/worker-configuration.d.ts
+apps/wfp-management/src/generated/
+node_modules/
+.env
+.env.*
+AGENTS.md
+ARCHITECTURE.md
+PLAN.md
+ohmyhost.md
+
+apps/public-site/site/
+apps/public-site/public/pages/
+
+brand/reference/
+
+# Page prose is authored by hand; formatting it would rewrite published copy.
+content/**/content.md
+
+# Immutable documentation snapshots and moved acceptance receipts.
+docs/plan/history/
+docs/plan/tmp/
+
+# Preserve the original dated incident receipt bytes.
+docs/plan/evidence/feedback/20261019-secret-storage-investigation.json
+
+# Mermaider verifies these generated outputs byte-for-byte against its source models.
+.mermaider/manifest.json
+docs/architecture/mermaider/index.html
+
+# Preserve the exact frozen independent Native routing diagnosis bytes.
+docs/plan/evidence/W37/20261106-sol-native-gateway-503-diagnosis.json
+
+# Preserve exact W38 machine coverage and already hash-pinned review receipts.
+docs/plan/evidence/W38/20261106-preview-runtime-coverage.json
+docs/plan/evidence/W38/20261106-preview-runtime-source-accounting.json
+docs/plan/evidence/W38/20261106-preview-api-service-diagram-review-followup.json
+docs/plan/evidence/W38/20261106-preview-bootstrap-api-service-diagram-followup.json
+docs/plan/evidence/W38/20261106-preview-migration-renumber-closure.json
+docs/plan/evidence/W38/20261106-preview-source-initialization-handoff-regression.json
+docs/plan/evidence/W38/20261107-preview-sleeping-authoring-generated-review.json
+docs/plan/evidence/W38/20261107-preview-sleeping-public-cohort-review.json
+
+# Preserve the exact independent current-main integration receipts and their hashes.
+docs/plan/evidence/W38/20261107-preview-main388-native-review.json
+docs/plan/evidence/W38/20261107-preview-main388-domain-webhook-review.json
+
+# Preserve the exact independent W41 source-review receipt bytes and reported hashes.
+docs/plan/evidence/W41/20261114-live-preview-fixture-source-review.json
+docs/plan/evidence/W41/20261115-live-preview-benchmark-delta-review.json
+docs/plan/evidence/W41/20261115-live-preview-qa-delta-review.json
+docs/plan/evidence/W41/20261115-live-qa-build-review.json
+docs/plan/evidence/W41/20261115-live-qa-final-cluster-review.json
+docs/plan/evidence/W41/20261115-live-preview-function-coverage-review.json
+docs/plan/evidence/W41/20261115-live-preview-mermaider-merge-review.json
+docs/plan/evidence/W41/20261115-live-preview-backup-gateway-deny-review.json
+docs/plan/evidence/W41/20261115-live-preview-backup-diagram-review.json
+
+# Preserve the normal website header copied from ohmyhost-web d46be1b.
+apps/control-api/test/fixtures/website-header.html

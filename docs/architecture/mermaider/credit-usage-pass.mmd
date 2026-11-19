@@ -1,0 +1,36 @@
+flowchart LR
+    n_e40dfff1a71e["Advance the source cursor; a failed<br/>window is repeated by the next pass"]
+    n_c374eea599bb["Cron at minutes 27 and 57 of every<br/>hour"]
+    n_01a334367330["A posting that fails is recorded in<br/>the Core: a rejected line, or a<br/>posting of an organization that<br/>already has a dead posting for the<br/>source, is dead at once; any other<br/>fault is dead after four passes; the<br/>cursor then advances and the window<br/>is no longer held"]
+    n_5d28a90f4498["The invocation fails and names the<br/>incomplete sources, the replay or<br/>the rotation"]
+    n_d74ff0ee8da3["Run the four sources in turn; one<br/>failing source does not stop the<br/>others"]
+    n_411df37d0329["pgcf: final hourly memory rollups<br/>(hours ended 2 h ago or earlier, at<br/>most 24 a pass): application and<br/>independent Native project database<br/>owners; afterwards disable schedules<br/>of the projects whose Stop budget is<br/>reached or whose organization is<br/>credit-denied (no balance past the<br/>grace, or at the overrun ceiling),<br/>at most 50 of each a pass"]
+    n_9c4ce9643a3b["Hold the PGCF cursor before<br/>unresolved Native creates or<br/>billable provider hours that are not<br/>final; retain earlier finalized<br/>hours"]
+    n_72231043bc18["Post per organization and window<br/>under an idempotent key; a window<br/>above 2,000 lines is split into hash<br/>parts of at most 1,000 lines and the<br/>Core books a window in one layout<br/>only; the Core charges the credit<br/>account"]
+    n_683b531f41ec["Price the lines with current rate<br/>cards; Native keeps project resource<br/>kind and no logical environment;<br/>unpriced meters are counted, not<br/>billed"]
+    n_db77fd01af95["r2: finished days (at most 3 a<br/>pass): billed buckets from the Core,<br/>storage peak and operations from the<br/>R2 usage collector"]
+    n_ac203c9843b5["Replay the postings that failed for<br/>good, oldest failure first, with<br/>backoff from 30 minutes doubling to<br/>a day; each is filed at the Core's<br/>clock; the invocation fails while<br/>one is still open"]
+    n_41d311a60552["resources: finished days (at most 3<br/>a pass): active WFP scripts and<br/>custom hostnames from the Core"]
+    n_299bcf54c044["Attempt the credit-log rotation; it<br/>waits until every cursor has passed<br/>00:00 UTC"]
+    n_389595a44dc9["Source skipped: the Core has no<br/>cursor row for it"]
+    n_96aaddc82102["wfp: Logpush objects of each<br/>finished hour (at most 12 a pass):<br/>billable requests and CPU time per<br/>script owner"]
+    n_c374eea599bb -->|"Usage cron"| n_d74ff0ee8da3
+    n_01a334367330 -->|"Dead-lettered: the window no longer<br/>holds the cursor"| n_e40dfff1a71e
+    n_01a334367330 -->|"Retried later"| n_ac203c9843b5
+    n_d74ff0ee8da3 -->|"Any source, the replay or the<br/>rotation failed"| n_5d28a90f4498
+    n_d74ff0ee8da3 -->|"Source 2 of 4"| n_411df37d0329
+    n_d74ff0ee8da3 -->|"Source 3 of 4"| n_db77fd01af95
+    n_d74ff0ee8da3 -->|"After the four sources"| n_ac203c9843b5
+    n_d74ff0ee8da3 -->|"Source 4 of 4"| n_41d311a60552
+    n_d74ff0ee8da3 -->|"No cursor for the source"| n_389595a44dc9
+    n_d74ff0ee8da3 -->|"Source 1 of 4"| n_96aaddc82102
+    n_411df37d0329 -->|"Unknown resource identity or<br/>non-final billed hour"| n_9c4ce9643a3b
+    n_411df37d0329 -->|"Lines per database owner"| n_683b531f41ec
+    n_72231043bc18 -->|"Every organization posted"| n_e40dfff1a71e
+    n_72231043bc18 -->|"A posting fails"| n_01a334367330
+    n_683b531f41ec -->|"Grouped by organization"| n_72231043bc18
+    n_db77fd01af95 -->|"Lines per bucket owner"| n_683b531f41ec
+    n_ac203c9843b5 -->|"A dead letter is still open"| n_5d28a90f4498
+    n_ac203c9843b5 -->|"Then the rotation attempt"| n_299bcf54c044
+    n_41d311a60552 -->|"Lines per environment"| n_683b531f41ec
+    n_96aaddc82102 -->|"Lines per script owner"| n_683b531f41ec

@@ -1,0 +1,47 @@
+{
+  "name": "@ohmyhost/control-api",
+  "version": "0.0.0",
+  "private": true,
+  "ohmyhost": {
+    "deployment": "production",
+    "fakeProviderBoundary": {
+      "typescriptProject": "tsconfig.build.json",
+      "artifactRoot": "dist",
+      "entrypoints": [
+        "src/index.ts",
+        "src/worker-main.ts"
+      ],
+      "bundles": []
+    }
+  },
+  "type": "module",
+  "scripts": {
+    "build": "node ../../scripts/prepare-portal-assets.mjs && tsc --project tsconfig.build.json",
+    "deploy:dry-run": "wrangler deploy --dry-run --outdir .wrangler/dry-run",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo",
+    "test": "vitest run --root ../.. apps/control-api/test"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.3.0",
+    "@ohmyhost/agent-skills": "workspace:*",
+    "@ohmyhost/contracts": "workspace:*",
+    "@ohmyhost/database": "workspace:*",
+    "@ohmyhost/dev-access-tokens": "workspace:*",
+    "@ohmyhost/platform": "workspace:*",
+    "@ohmyhost/project-handles": "workspace:*",
+    "@ohmyhost/sdk-ts": "workspace:*",
+    "@ohmyhost/workos-auth-contracts": "workspace:*",
+    "@ohmyhost/workos-token-verifier": "workspace:*",
+    "canonicalize": "2.1.0",
+    "hono": "4.13.18",
+    "iron-session": "8.0.4",
+    "pg": "8.22.0",
+    "zod": "4.6.6"
+  },
+  "devDependencies": {
+    "@types/pg": "8.20.0",
+    "@zip.js/zip.js": "2.13.1",
+    "node-pg-migrate": "9.0.0",
+    "wrangler": "4.125.0"
+  }
+}

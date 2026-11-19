@@ -1,0 +1,15 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-storage-gateway",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-08-24",
+  "compatibility_flags": ["nodejs_compat", "enable_request_signal"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": false },
+  "vars": {
+    "RUNTIME_CONFIGURATION_STATE": "disabled",
+    "CLOUDFLARE_ACCOUNT_ID": "00000000000000000000000000000000",
+  },
+  // CLOUDFLARE_R2_API_TOKEN and CLOUDFLARE_R2_PARENT_ACCESS_KEY_ID are Worker secrets.
+}

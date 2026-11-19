@@ -1,0 +1,85 @@
+{
+  "diagrams": [
+    "architecture_f188c0fbbed3",
+    "customer-deployment",
+    "customer-deployment-sequence",
+    "architecture_d463264591f1",
+    "credit-usage-pass",
+    "credit-charge",
+    "credit-log-rotation",
+    "data:schema:apps/control-store/migrations"
+  ],
+  "files": [
+    {
+      "path": "docs/architecture/mermaider/credit-charge.md",
+      "sha256": "d5120ca23c0db0da7ac23b353a6e28b895611599042eb7f560a481c27c0fa246"
+    },
+    {
+      "path": "docs/architecture/mermaider/credit-charge.mmd",
+      "sha256": "abc742079932497de777545546c8c86c925fae70fb10132eec96e285339890c9"
+    },
+    {
+      "path": "docs/architecture/mermaider/credit-log-rotation.md",
+      "sha256": "44d94dc7ad9f19251e87840ffe6a7472a1d473cddb9cbf12987ee45b322cfc88"
+    },
+    {
+      "path": "docs/architecture/mermaider/credit-log-rotation.mmd",
+      "sha256": "170c342dc3b3db8430a0bebcbfbfd714666636fbbb49f13d84d98739ded078d7"
+    },
+    {
+      "path": "docs/architecture/mermaider/credit-service-resources.md",
+      "sha256": "2fb018f4779f6af8f0cb9b81eebf0b367254e2276862bccca3c1ef99e0bfe391"
+    },
+    {
+      "path": "docs/architecture/mermaider/credit-service-resources.mmd",
+      "sha256": "5d909185ee35f33afbef7200e1bb494c128f4fc45572315888cafeda423dc881"
+    },
+    {
+      "path": "docs/architecture/mermaider/credit-tables.md",
+      "sha256": "b1c6155ab3f9123304a91e57ee1c691527b8be16d9fbeba60b8cf121348d30b4"
+    },
+    {
+      "path": "docs/architecture/mermaider/credit-tables.mmd",
+      "sha256": "ac83887f417ef34a60069857d5e808da08a524666eff3af2ccc7d160f675b35a"
+    },
+    {
+      "path": "docs/architecture/mermaider/credit-usage-pass.md",
+      "sha256": "849b6f05e42b4d391c227d183c61d0c4467076e75e8643ad78ca81deb7f2b750"
+    },
+    {
+      "path": "docs/architecture/mermaider/credit-usage-pass.mmd",
+      "sha256": "aa694bef54a5eeac593cbe69f69c65525687935cb5dfc5e32f4a6db2dcdbd0f9"
+    },
+    {
+      "path": "docs/architecture/mermaider/customer-deployment-sequence.md",
+      "sha256": "7800c18bb304b1a8606c18eb034fd67066b1c808deb6983c2461acb0742f586f"
+    },
+    {
+      "path": "docs/architecture/mermaider/customer-deployment-sequence.mmd",
+      "sha256": "834cc5e793c4b1cf27ff3b6cf6abe2e0f44c06e2f5f963a0b31fa382c6d29f36"
+    },
+    {
+      "path": "docs/architecture/mermaider/customer-deployment.md",
+      "sha256": "c730f929bd4da27a23d86768333d46e0336ab175e7815b3a3c50d4b90c34f23e"
+    },
+    {
+      "path": "docs/architecture/mermaider/customer-deployment.mmd",
+      "sha256": "f93237737b28621c90c49fd554d64e202f23dfacb5b9a76e8692ae93ccd4dc31"
+    },
+    {
+      "path": "docs/architecture/mermaider/deployment-resources.md",
+      "sha256": "2fa07d3affe22fccdb5e88a7262235f25d57d5f6a340884ed47ad6787ddbddb8"
+    },
+    {
+      "path": "docs/architecture/mermaider/deployment-resources.mmd",
+      "sha256": "75f1fe9428adfda990a3d86669da423c06a8ee0ce2131b89a085120c80c3300c"
+    },
+    {
+      "path": "docs/architecture/mermaider/index.html",
+      "sha256": "966b9949bdd0416bedff86df6caf8439f41a412e015ab4252d95bc4b30b4c727"
+    }
+  ],
+  "fingerprint": "f6a1b0a01172bc3b88d8276944ea4f71680340d832fddd2672740815c2bb0c34",
+  "toolVersion": "0.1.1",
+  "version": 1
+}

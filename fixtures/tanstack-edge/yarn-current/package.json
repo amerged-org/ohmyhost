@@ -1,0 +1,25 @@
+{
+  "name": "ohmyhost-fixture-tanstack-yarn-current",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "packageManager": "yarn@4.9.4",
+  "scripts": {
+    "build": "vite build && tsc --noEmit"
+  },
+  "dependencies": {
+    "@tanstack/react-router": "1.170.31",
+    "@tanstack/react-start": "1.168.49",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "1.53.1",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "@vitejs/plugin-react": "6.1.0",
+    "typescript": "5.9.2",
+    "vite": "8.2.2"
+  }
+}

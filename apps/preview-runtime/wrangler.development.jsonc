@@ -1,0 +1,101 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-live-preview-poc-private-fullstack",
+  "account_id": "00000000000000000000000000000001",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-11-11",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": {
+    "PREVIEW_HOST_SUFFIX": "preview.dev.omh.st",
+    "CLOUDFLARE_ACCOUNT_ID": "00000000000000000000000000000001",
+    "PREVIEW_CONTAINER_APPLICATION_NAME": "ohmyho-live-preview-poc-private-fullstack",
+  },
+  "secrets": {
+    "required": ["CLOUDFLARE_PREVIEW_USAGE_TOKEN"],
+  },
+  "services": [
+    {
+      "binding": "PREVIEW_AUTHORITY",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "ProjectPreviewRuntime",
+    },
+    {
+      "binding": "PREVIEW_USAGE_REPORTER",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "PreviewUsageReporterRuntime",
+    },
+    {
+      "binding": "PREVIEW_SOURCE",
+      "service": "ohmyho-source-fetcher-poc-private-fullstack",
+      "entrypoint": "SourceFetcherService",
+    },
+    {
+      "binding": "PREVIEW_RUNTIME_SECRETS",
+      "service": "ohmyho-runtime-secret-delivery-poc-private-fullstack",
+      "entrypoint": "RuntimeSecretDeliveryPreview",
+    },
+    {
+      "binding": "DATABASE_PREVIEW_US",
+      "service": "ohmyho-project-database-development-us",
+      "entrypoint": "ProjectDatabasePreview",
+    },
+    {
+      "binding": "NATIVE_PREVIEW_US",
+      "service": "ohmyho-native-auth-development-us",
+      "entrypoint": "NativeProductPreviewService",
+    },
+    {
+      "binding": "DATABASE_PREVIEW_EU",
+      "service": "ohmyho-project-database-development-eu",
+      "entrypoint": "ProjectDatabasePreview",
+    },
+    {
+      "binding": "NATIVE_PREVIEW_EU",
+      "service": "ohmyho-native-auth-development-eu",
+      "entrypoint": "NativeProductPreviewService",
+    },
+    {
+      "binding": "PREVIEW_NATIVE_PREPARATION",
+      "service": "ohmyho-neon-management-poc-private-fullstack",
+      "entrypoint": "PreviewNativePreparationService",
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "BACKUP_BUCKET",
+      "bucket_name": "ohmyho-live-preview-backups-development",
+    },
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "PREVIEW_CONTAINERS",
+        "class_name": "PreviewSandbox",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["PreviewSandbox"],
+    },
+  ],
+  "containers": [
+    {
+      "name": "ohmyho-live-preview-poc-private-fullstack",
+      "class_name": "PreviewSandbox",
+      "scheduling_policy": "durable_object",
+      "images": {
+        "preview": {
+          "dockerfile": "./container/Dockerfile",
+          "build_context": "../..",
+        },
+      },
+    },
+  ],
+  "triggers": {
+    "crons": ["*/1 * * * *"],
+  },
+}

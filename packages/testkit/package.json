@@ -1,0 +1,24 @@
+{
+  "name": "@ohmyhost/testkit",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo",
+    "test": "vitest run --root ../.. packages/testkit/src"
+  },
+  "dependencies": {
+    "@ohmyhost/adapter-tanstack": "workspace:*",
+    "@ohmyhost/adapter-vite": "workspace:*",
+    "@ohmyhost/contracts": "workspace:*",
+    "@ohmyhost/platform": "workspace:*"
+  }
+}

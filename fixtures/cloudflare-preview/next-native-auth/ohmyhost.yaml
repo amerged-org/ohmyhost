@@ -1,0 +1,15 @@
+version: 1
+project: preview-next-native-auth
+build:
+  install: pnpm install --frozen-lockfile --ignore-scripts
+  command: pnpm run build
+  output: .next
+runtime:
+  mode: edge
+database:
+  enabled: true
+  migrations: postgres/migrations
+mail:
+  enabled: false
+auth:
+  provider: omh-native

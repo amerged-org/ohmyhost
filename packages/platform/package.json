@@ -1,0 +1,32 @@
+{
+  "name": "@ohmyhost/platform",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./shared": {
+      "source": "./src/shared/index.ts",
+      "types": "./dist/shared/index.d.ts",
+      "import": "./dist/shared/index.js"
+    },
+    "./ports": {
+      "source": "./src/ports/index.ts",
+      "types": "./dist/ports/index.d.ts",
+      "import": "./dist/ports/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo",
+    "test": "vitest run --root ../.. packages/platform/src"
+  },
+  "dependencies": {
+    "@ohmyhost/contracts": "workspace:*",
+    "tldts": "7.4.16"
+  }
+}

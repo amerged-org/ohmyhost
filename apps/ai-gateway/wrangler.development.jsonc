@@ -1,0 +1,48 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-ai-gateway-poc-private-fullstack",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "enable_request_signal"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+  },
+  "account_id": "00000000000000000000000000000001",
+  // The hostname ai.dev.ohmyho.st was confirmed by the owner on 2026-11-02. The route is created by the first
+  // platform-release.mjs run of this file, and the secret ORQ_API_KEY comes from --secrets-file, never from this file.
+  "routes": [{ "pattern": "ai.dev.ohmyho.st", "custom_domain": true }],
+  // The orq key is the Worker secret ORQ_API_KEY (set outside this file, never in it). The gateway calls orq only
+  // through ORQ_BASE_URL, whose origin must equal ORQ_ORIGIN.
+  "vars": {
+    "ORQ_BASE_URL": "https://my.orq.ai/v3/router",
+    "ORQ_ORIGIN": "https://my.orq.ai",
+  },
+  // The reservation sweep releases AI reservations that no call settled (a crashed Worker), every 10 minutes.
+  "triggers": { "crons": ["*/10 * * * *"] },
+  // AUTH_LIMITER bounds the well-formed requests of one source address to 3000 per 60 seconds (a source may be shared by many customer Workers), before the Core is asked; malformed keys are refused first and spend nothing.
+  // PROJECT_LIMITER bounds the calls of one project to 600 per 60 seconds.
+  "ratelimits": [
+    {
+      "name": "AUTH_LIMITER",
+      "namespace_id": "2204",
+      "simple": { "limit": 3000, "period": 60 },
+    },
+    {
+      "name": "PROJECT_LIMITER",
+      "namespace_id": "2202",
+      "simple": { "limit": 600, "period": 60 },
+    },
+  ],
+  // The gateway reaches the environment's Core only through the AI_RUNTIME service binding and holds no database
+  // credential.
+  "services": [
+    {
+      "binding": "AI_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "AiGatewayRuntime",
+    },
+  ],
+}

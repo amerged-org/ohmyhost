@@ -1,0 +1,381 @@
+import { signupSource, siteRequestResponse, type PublicControlBinding } from "./site-requests.js";
+import { customerDocument, isClientDownload, documentationRedirect } from "./customer-entry.js";
+import { SITE_ICON } from "./generated-site-frame.js";
+import { sitemapEntries } from "./page-meta.js";
+// A shell-single-quoted assignment carries this value into the installer script.
+const SHELL_SAFE_SOURCE = /^[a-z0-9][a-z0-9_-]{0,63}$/u;
+const HOME = "https://ohmyho.st/";
+/** Search and answer engines are welcome; the login and referral variants stay out of the index. */
+const ROBOTS = [
+  "User-agent: *",
+  "Allow: /",
+  "Disallow: /login",
+  "Disallow: /*?r=",
+  "",
+  ...[
+    "GPTBot",
+    "OAI-SearchBot",
+    "ChatGPT-User",
+    "ClaudeBot",
+    "anthropic-ai",
+    "Claude-SearchBot",
+    "PerplexityBot",
+    "Google-Extended",
+  ].map((agent) => `User-agent: ${agent}`),
+  "Allow: /",
+  "",
+  "Sitemap: https://ohmyho.st/sitemap.xml",
+  "",
+].join("\n");
+/** The pages this Worker serves without the website binding; every other sitemap entry needs that binding. */
+const OWN_PAGE_PATHS = new Set(["/", "/brand"]);
+const ATTRIBUTE_ESCAPES: Record<string, string> = {
+  "&": "&amp;",
+  '"': "&quot;",
+  "'": "&#39;",
+  "<": "&lt;",
+  ">": "&gt;",
+};
+function signupSourceMeta(source: string): string {
+  const escaped = source.replaceAll(/["&'<>]/gu, (character) => ATTRIBUTE_ESCAPES[character] ?? "");
+  return `<meta name="ohmyhost-signup-source" content="${escaped}"></head>`;
+}
+
+function browserRegionMeta(request: Request): string {
+  const cf = (request as Request & { cf?: { country?: unknown; continent?: unknown } }).cf;
+  let region = "";
+  if (
+    request.headers.get("sec-fetch-mode") === "navigate" &&
+    request.headers.get("sec-fetch-dest") === "document" &&
+    typeof cf?.country === "string" &&
+    /^[A-Z]{2}$/u.test(cf.country) &&
+    cf.country !== "XX"
+  ) {
+    if (cf.country === "CY" || cf.continent === "EU") region = "eu";
+    else if (typeof cf.continent === "string" && /^(AF|AN|AS|NA|OC|SA)$/u.test(cf.continent))
+      region = "us";
+  }
+  return `<meta name="ohmyhost-region-hint" content="${region}"></head>`;
+}
+
+/**
+ * The paths this Worker answers itself: the released clients and their installer, and the agent instruction documents
+ * a customer's agent reads and runs (the installer names them), which come from this release, never the website.
+ */
+function isPlatformOwnedPath(path: string): boolean {
+  return (
+    path === "/0.sh" ||
+    path === "/client-release.json" ||
+    path === "/llms.txt" ||
+    path === "/AGENTS.md" ||
+    path === "/auth.md" ||
+    path === "/mcp.json" ||
+    path === "/mcp-tools.json" ||
+    path === "/.well-known/agent-skills/index.json" ||
+    path === "/.well-known/skills/index.json" ||
+    path.startsWith("/skills/") ||
+    isClientDownload(path)
+  );
+}
+
+export default {
+  async fetch(
+    request: Request,
+    env?: {
+      ASSETS: { fetch(request: Request): Promise<Response> };
+      CONTROL_API?: PublicControlBinding;
+      /** The website's own Worker, released from amerged-org/ohmyhost-web. */
+      WEBSITE?: { fetch(request: Request): Promise<Response> };
+    },
+  ): Promise<Response> {
+    const url = new URL(request.url);
+    const host = url.hostname;
+    const ownHost =
+      host === "ohmyho.st" ||
+      host === "www.ohmyho.st" ||
+      host === "omh.st" ||
+      host === "check.omh.st" ||
+      host.endsWith(".check.omh.st");
+    const headers = new Headers({
+      "cache-control": "no-store",
+      "strict-transport-security": "max-age=31536000; includeSubDomains",
+      "referrer-policy": "no-referrer",
+      "x-content-type-options": "nosniff",
+      "content-security-policy":
+        "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+    });
+    if (!ownHost || !["https:", "http:"].includes(url.protocol))
+      return new Response(null, { status: 404, headers });
+    // The website is its own repository and its own Worker, so a copy change ships without a platform
+    // release. This entry keeps the hostname, the client downloads and the project addresses. Without
+    // the binding it serves no copy of the legal, pricing or content pages and answers 503 for them;
+    // rolling back means redeploying the previous website Worker version.
+    if (env?.WEBSITE && host === "ohmyho.st" && !isPlatformOwnedPath(url.pathname))
+      return env.WEBSITE.fetch(request);
+    if (url.origin === "https://ohmyho.st") {
+      const answered = await siteRequestResponse(request, env?.CONTROL_API);
+      if (answered) {
+        for (const [key, value] of headers)
+          if (key !== "content-security-policy") answered.headers.set(key, value);
+        return request.method === "HEAD" ? new Response(null, answered) : answered;
+      }
+    }
+    if (request.method !== "GET" && request.method !== "HEAD") {
+      headers.set("allow", "GET, HEAD");
+      return new Response(null, { status: 405, headers });
+    }
+    const sources = url.searchParams.getAll("r");
+    const querySource = sources.length === 1 ? signupSource(sources[0]) : undefined;
+    if (host === "www.ohmyho.st") {
+      const target = new URL(HOME);
+      target.pathname = url.pathname;
+      if (querySource) target.searchParams.set("r", querySource);
+      headers.set("location", target.href);
+      return new Response(null, { status: 308, headers });
+    }
+    let cookieSource: string | undefined;
+    try {
+      const value = request.headers
+        .get("cookie")
+        ?.split(";")
+        .map((item) => item.trim())
+        .find((item) => item.startsWith("omh_referral="));
+      if (value)
+        cookieSource = signupSource(decodeURIComponent(value.slice("omh_referral=".length)));
+    } catch {
+      /* Ignore malformed optional attribution cookies. */
+    }
+    const source = sources.length ? querySource : cookieSource;
+    // Signup is open: the source is attribution only, so it never hides or unlocks anything.
+    const attribution = source !== undefined && SHELL_SAFE_SOURCE.test(source) ? source : undefined;
+    const loginHref = attribution === undefined ? "/login" : `/login?r=${attribution}`;
+    const contentPage =
+      ["/", "/brand", "/api", "/login"].includes(url.pathname) ||
+      url.pathname === "/docs.md" ||
+      url.pathname === "/docs" ||
+      url.pathname.startsWith("/docs/");
+    if (host === "ohmyho.st" && url.protocol === "https:" && contentPage && querySource) {
+      headers.set(
+        "set-cookie",
+        `omh_referral=${encodeURIComponent(querySource)}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=2592000`,
+      );
+    }
+    if (url.pathname === "/0.sh" && (host === "omh.st" || host === "ohmyho.st")) {
+      if (url.protocol !== "https:") {
+        headers.set("location", "https://omh.st/0.sh");
+        return new Response(null, { status: 308, headers });
+      }
+      headers.set("content-type", "text/x-shellscript; charset=utf-8");
+      if (!env?.ASSETS)
+        return new Response(request.method === "HEAD" ? null : "Installer unavailable.", {
+          status: 503,
+          headers,
+        });
+      const script = await env.ASSETS.fetch(new Request(`${HOME}pages/0.sh`));
+      if (!script.ok) return new Response(null, { status: script.status, headers });
+      const text = (await script.text()).replace(
+        "set -euo pipefail",
+        `set -euo pipefail\nOHMYHOST_SIGNUP_SOURCE='${attribution ?? ""}'`,
+      );
+      return new Response(request.method === "HEAD" ? null : text, { headers });
+    }
+    if (host !== "ohmyho.st" || url.protocol !== "https:") {
+      const referralHost = host === "omh.st" || host === "check.omh.st";
+      headers.set(
+        "location",
+        referralHost && source !== undefined ? `${HOME}?r=${encodeURIComponent(source)}` : HOME,
+      );
+      return new Response(null, { status: 302, headers });
+    }
+    if (url.pathname === "/robots.txt") {
+      headers.set("content-type", "text/plain; charset=utf-8");
+      headers.set("cache-control", "public, max-age=3600");
+      return new Response(request.method === "HEAD" ? null : ROBOTS, { headers });
+    }
+    if (url.pathname === "/sitemap.xml") {
+      headers.set("content-type", "application/xml; charset=utf-8");
+      headers.set("cache-control", "public, max-age=3600");
+      // Without the website binding this Worker answers only its own pages, so the sitemap lists only those.
+      const entries = env?.WEBSITE
+        ? sitemapEntries()
+        : sitemapEntries().filter(({ path }) => OWN_PAGE_PATHS.has(path));
+      return new Response(
+        request.method === "HEAD"
+          ? null
+          : `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${entries
+              .map(
+                ({ path, lastmod }) =>
+                  `<url><loc>https://ohmyho.st${path}</loc><lastmod>${lastmod}</lastmod></url>`,
+              )
+              .join("")}</urlset>`,
+        { headers },
+      );
+    }
+    if (url.pathname === "/login") {
+      headers.set(
+        "location",
+        `https://app.ohmyho.st/login${source && /^[a-z0-9][a-z0-9_-]{0,63}$/u.test(source) ? `?r=${encodeURIComponent(source)}` : ""}`,
+      );
+      return new Response(null, { status: 302, headers });
+    }
+    const wantsMarkdown = request.headers.get("accept")?.includes("text/markdown") === true;
+    const redirect = documentationRedirect(url.pathname, wantsMarkdown);
+    if (redirect) {
+      headers.set("location", redirect);
+      headers.set("vary", "Accept");
+      return new Response(null, { status: 308, headers });
+    }
+    const document = customerDocument(url.pathname);
+    if (document) {
+      headers.set("content-type", document.type);
+      headers.set("vary", "Accept");
+      return new Response(request.method === "HEAD" ? null : document.text, {
+        status: 200,
+        headers,
+      });
+    }
+    if (isClientDownload(url.pathname)) {
+      if (!env?.ASSETS)
+        return new Response("Client release is unavailable.", { status: 503, headers });
+      const asset = await env.ASSETS.fetch(
+        new Request(`${HOME.slice(0, -1)}${url.pathname}`, { method: request.method }),
+      );
+      const response = new Response(asset.body, asset);
+      for (const [name, value] of headers) response.headers.set(name, value);
+      if (response.ok) response.headers.set("cache-control", "public, max-age=31536000, immutable");
+      return response;
+    }
+    if (url.pathname === "/favicon.svg") {
+      headers.set("content-type", "image/svg+xml");
+      headers.set("cache-control", "public, max-age=86400");
+      return new Response(request.method === "HEAD" ? null : SITE_ICON, { headers });
+    }
+    const pages: Record<string, string> = {
+      "/": "home.html",
+      "/og.png": "og.png",
+      "/logo.png": "logo.png",
+      "/favicon.ico": "brand-assets/favicon.ico",
+      "/apple-touch-icon.png": "brand-assets/apple-touch-icon.png",
+      ...Object.fromEntries(
+        [
+          "omega-light.svg",
+          "omega-dark.svg",
+          "omega-light.png",
+          "omega-dark.png",
+          "favicon.svg",
+          "favicon.ico",
+          "apple-touch-icon.png",
+          "og.png",
+        ].map((file) => [`/brand/assets/${file}`, `brand-assets/${file}`]),
+      ),
+      "/index.md": "index.md",
+      "/brand": "brand.html",
+      "/brand.md": "brand.md",
+      "/api/openapi.yaml": "openapi.yaml",
+      "/api/openapi.json": "openapi.json",
+    };
+    const markdownPath = url.pathname === "/" ? "/index.md" : `${url.pathname}.md`;
+    const selected = wantsMarkdown && pages[markdownPath] ? markdownPath : url.pathname;
+    const page = pages[selected];
+    const logo =
+      /^\/logos\/(?:composio|github|make|n8n|nextjs|postgres|react|tanstack|vite|zapier|betterauth|workos|gdrive|s3|r2)\.svg$/u.test(
+        url.pathname,
+      );
+    const font = /^\/fonts\/[a-f0-9]{16}\.ttf$/u.test(url.pathname);
+    const social = /^\/og\/[a-z0-9-]+\.png$/u.test(url.pathname);
+    if (!page && !logo && !font && !social) {
+      const apiRequest = url.pathname.startsWith("/v1/");
+      // Without the website binding, a path this Worker does not hold may be a website page: it
+      // answers 503, not a 404 that denies the page exists. The API, the release downloads and the
+      // platform-owned paths keep their 404.
+      if (
+        !apiRequest &&
+        !url.pathname.startsWith("/releases/") &&
+        !isPlatformOwnedPath(url.pathname)
+      ) {
+        headers.set("content-type", "text/markdown; charset=utf-8");
+        headers.set("retry-after", "300");
+        return new Response(
+          request.method === "HEAD"
+            ? null
+            : "# Temporarily unavailable\n\nThe ohmyho.st website is not reachable through this entry right now. Read [llms.txt](https://ohmyho.st/llms.txt), the [documentation index](https://docs.ohmyho.st/llms.txt), or [OpenAPI](https://ohmyho.st/api/openapi.json).\n",
+          { status: 503, headers },
+        );
+      }
+      headers.set(
+        "content-type",
+        apiRequest ? "application/problem+json" : "text/markdown; charset=utf-8",
+      );
+      const body = apiRequest
+        ? JSON.stringify({
+            type: "https://ohmyho.st/api/errors/resource-not-found",
+            title: "Resource not found",
+            status: 404,
+            code: "resource_not_found",
+            detail:
+              "The product API base is https://app.ohmyho.st/v1. Read https://ohmyho.st/api/openapi.json.",
+          })
+        : "# Page not found\n\nRead [llms.txt](https://ohmyho.st/llms.txt), the [documentation index](https://docs.ohmyho.st/llms.txt), or [OpenAPI](https://ohmyho.st/api/openapi.json).\n";
+      return new Response(request.method === "HEAD" ? null : body, { status: 404, headers });
+    }
+    if (!env?.ASSETS)
+      return new Response(request.method === "HEAD" ? null : "Page is unavailable.", {
+        status: 503,
+        headers,
+      });
+    const asset = await env.ASSETS.fetch(
+      new Request(
+        `${HOME.slice(0, -1)}${logo || font || social ? url.pathname : `/pages/${page}`}`,
+      ),
+    );
+    if (!asset.ok) return new Response(null, { status: asset.status, headers });
+    if (page?.endsWith(".png") || page?.endsWith(".ico") || font || social) {
+      headers.set(
+        "content-type",
+        font ? "font/ttf" : page?.endsWith(".ico") ? "image/x-icon" : "image/png",
+      );
+      if (font) headers.set("access-control-allow-origin", "*");
+      headers.set(
+        "cache-control",
+        font ? "public, max-age=31536000, immutable" : "public, max-age=86400",
+      );
+      return new Response(request.method === "HEAD" ? null : asset.body, { headers });
+    }
+    let body = await asset.text();
+    const type =
+      logo || page?.endsWith(".svg")
+        ? "image/svg+xml"
+        : page?.endsWith(".md")
+          ? "text/markdown; charset=utf-8"
+          : page?.endsWith(".yaml")
+            ? "application/yaml; charset=utf-8"
+            : page?.endsWith(".json")
+              ? "application/json; charset=utf-8"
+              : "text/html; charset=utf-8";
+    if (type === "image/svg+xml") headers.set("cache-control", "public, max-age=86400");
+    if (type.startsWith("text/html")) {
+      if (attribution)
+        body = body
+          .replaceAll('href="https://ohmyho.st/login"', `href="https://ohmyho.st${loginHref}"`)
+          .replaceAll('href="/login"', `href="${loginHref}"`);
+      const hashes: string[] = [];
+      for (const script of body.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gu)) {
+        const hash = new Uint8Array(
+          await crypto.subtle.digest("SHA-256", new TextEncoder().encode(script[1] ?? "")),
+        );
+        hashes.push(`'sha256-${btoa(String.fromCharCode(...hash))}'`);
+      }
+      headers.set(
+        "content-security-policy",
+        `default-src 'none'; script-src 'self' ${hashes.join(" ")}; style-src 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self'; worker-src blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
+      );
+      headers.set("link", `<${markdownPath}>; rel="alternate"; type="text/markdown"`);
+      if (page === "home.html" && source)
+        body = body.replace("</head>", () => signupSourceMeta(source));
+      if (page === "home.html") body = body.replace("</head>", () => browserRegionMeta(request));
+    }
+    headers.set("content-type", type);
+    headers.set("vary", "Accept");
+    return new Response(request.method === "HEAD" ? null : body, { headers });
+  },
+};

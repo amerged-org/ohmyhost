@@ -1,0 +1,133 @@
+{
+  "format": "ohmyhost.licenses/v1",
+  "copyright": "Copyright 2026 Amerged B.V.",
+  "defaultLicense": "Elastic-2.0",
+  "apacheWorkspaces": [
+    "apps/product-cli",
+    "apps/mcp",
+    "packages/sdk-ts",
+    "packages/customer-runtime",
+    "packages/customer-auth-better-auth",
+    "packages/contracts",
+    "packages/workos-auth-contracts",
+    "packages/agent-skills",
+    "packages/postgres-bridge"
+  ],
+  "apachePaths": ["skills"],
+  "licenseTexts": {
+    "Elastic-2.0": "licenses/Elastic-2.0.txt",
+    "Apache-2.0": "licenses/CLIENTS-APACHE-2.0.txt",
+    "MIT": "licenses/MIT-ohmyhost-web.txt"
+  },
+  "preservedNotices": [
+    "licenses/CLIENTS-APACHE-2.0.txt",
+    "packages/postgres-bridge/LICENSE",
+    "packages/postgres-bridge/NOTICE",
+    "licenses/MIT-ohmyhost-web.txt"
+  ],
+  "thirdPartyAssets": [
+    {
+      "name": "JetBrains Mono",
+      "license": "OFL-1.1",
+      "upstream": "https://github.com/JetBrains/JetBrainsMono",
+      "notice": "apps/public-site/public/fonts/JetBrainsMono-OFL.txt",
+      "paths": [
+        "apps/public-site/public/fonts/3386a05f6ece969e.ttf",
+        "apps/public-site/public/fonts/44ce4a84f20d60f2.ttf"
+      ]
+    },
+    {
+      "name": "Space Grotesk",
+      "license": "OFL-1.1",
+      "upstream": "https://github.com/floriankarsten/space-grotesk",
+      "notice": "apps/public-site/public/fonts/SpaceGrotesk-OFL.txt",
+      "paths": [
+        "apps/public-site/public/fonts/3e699ead1876244f.ttf",
+        "apps/public-site/public/fonts/3e756954468ff1cb.ttf",
+        "apps/public-site/public/fonts/6c0346b8d297ebdc.ttf",
+        "apps/public-site/public/fonts/ec926d5065eaca49.ttf"
+      ]
+    },
+    {
+      "name": "Simple Icons 16.30.0",
+      "license": "CC0-1.0",
+      "notice": "apps/public-site/site/ASSET-SOURCES.md",
+      "paths": [
+        "apps/public-site/public/logos/betterauth.svg",
+        "apps/public-site/public/logos/gdrive.svg",
+        "apps/public-site/public/logos/github.svg",
+        "apps/public-site/public/logos/make.svg",
+        "apps/public-site/public/logos/n8n.svg",
+        "apps/public-site/public/logos/nextjs.svg",
+        "apps/public-site/public/logos/postgres.svg",
+        "apps/public-site/public/logos/r2.svg",
+        "apps/public-site/public/logos/react.svg",
+        "apps/public-site/public/logos/tanstack.svg",
+        "apps/public-site/public/logos/vite.svg",
+        "apps/public-site/public/logos/zapier.svg"
+      ]
+    },
+    {
+      "name": "Composio logo",
+      "notice": "apps/public-site/site/ASSET-SOURCES.md",
+      "scope": "Upstream brand asset. The repository's software licences do not grant independent trademark rights.",
+      "paths": ["apps/public-site/public/logos/composio.svg"]
+    }
+  ],
+  "websiteMaterials": {
+    "license": "MIT",
+    "upstream": "https://github.com/amerged-org/ohmyhost-web",
+    "relativeToCommit": "72859be1bf9d262e0b7a8fdde7063498b669bb8b",
+    "notice": "licenses/MIT-ohmyhost-web.txt",
+    "scope": "Preserves the original MIT grant for website-owned material and copied portions. The listed upstream font and logo terms continue to apply to their files.",
+    "paths": [
+      "apps/public-site/public/logos/s3.svg",
+      "apps/public-site/public/logos/workos.svg",
+      "apps/public-site/site/ASSET-SOURCES.md",
+      "apps/public-site/site/brand.html",
+      "apps/public-site/site/figure-count.js",
+      "apps/public-site/site/fonts.css",
+      "apps/public-site/site/home.html",
+      "apps/public-site/site/logo.png",
+      "apps/public-site/site/logo.svg",
+      "apps/public-site/site/og.png",
+      "apps/public-site/site/og.svg",
+      "apps/public-site/src/content/format.ts",
+      "apps/public-site/src/content/sources.ts",
+      "apps/public-site/src/content/tree.ts",
+      "apps/public-site/src/content/types.ts",
+      "apps/public-site/src/customer-entry.ts",
+      "apps/public-site/src/figures.ts",
+      "apps/public-site/src/generated-mcp-tools.json",
+      "apps/public-site/src/generated-pricing.ts",
+      "apps/public-site/src/launch-pages.ts",
+      "apps/public-site/src/legal-documents.ts",
+      "apps/public-site/src/og-pages.ts",
+      "apps/public-site/src/page-meta.ts",
+      "apps/public-site/src/site-links.ts",
+      "apps/public-site/src/site-requests.ts",
+      "apps/public-site/test/content-tree.test.ts",
+      "apps/public-site/test/og-pages.test.ts",
+      "apps/public-site/tsconfig.build.json",
+      "brand/assets/apple-touch-icon.png",
+      "brand/assets/favicon.ico",
+      "brand/assets/favicon.svg",
+      "brand/assets/og.png",
+      "brand/assets/omega-dark.png",
+      "brand/assets/omega-dark.svg",
+      "brand/assets/omega-light.png",
+      "brand/assets/omega-light.svg",
+      "content/contact/content.md",
+      "content/data/scenarios.json",
+      "content/data/workloads.json",
+      "content/dpa/content.md",
+      "content/dpa/subprocessors/page.json",
+      "content/dpa/toms/content.md",
+      "content/dpa/transfers/content.md",
+      "content/philosophy/content.md",
+      "content/pricing/breakdown/content.md",
+      "content/status/content.md",
+      "content/terms/content.md"
+    ]
+  }
+}

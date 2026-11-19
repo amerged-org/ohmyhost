@@ -1,0 +1,71 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-wfp-management-production",
+  "account_id": "00000000000000000000000000000001",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-08-19",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": {
+    "WFP_ACCOUNT_ID": "00000000000000000000000000000001",
+    "WFP_DISPATCH_NAMESPACE": "ohmyho-production",
+    "DATABASE_SERVICE_US": "ohmyho-project-database-production-us",
+    "DATABASE_SERVICE_EU": "ohmyho-project-database-production-eu",
+    "NATIVE_AUTH_SERVICE_US": "ohmyho-native-auth-production-us",
+    "NATIVE_AUTH_SERVICE_EU": "ohmyho-native-auth-production-eu",
+    "WFP_WORKERS_DEV_SUBDOMAIN": "your-omh-account",
+    "BUILD_OBJECTS_BUCKET_US": "ohmyho-builds-production",
+    "BUILD_OBJECTS_BUCKET_EU": "ohmyho-builds-production-eu",
+  },
+  // The health probe runs customer code through this binding, so it declares the egress policy
+  // Worker, and every get() passes the project's EGRESS_CONTEXT, exactly as the gateway does.
+  "dispatch_namespaces": [
+    {
+      "binding": "WFP_DISPATCH",
+      "namespace": "ohmyho-production",
+      "outbound": { "service": "ohmyho-wfp-egress-production", "parameters": ["EGRESS_CONTEXT"] },
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "BUILD_OBJECTS_US",
+      "bucket_name": "ohmyho-builds-production",
+      "jurisdiction": "us",
+    },
+    {
+      "binding": "BUILD_OBJECTS_EU",
+      "bucket_name": "ohmyho-builds-production-eu",
+      "jurisdiction": "eu",
+    },
+  ],
+  "services": [
+    {
+      "binding": "GROWTH_ANALYTICS",
+      "service": "ohmyho-growth-analytics-production",
+      "entrypoint": "GrowthCollectRuntime",
+    },
+    {
+      "binding": "NATIVE_AUTH_REGISTRY_AUTHORITY",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "NativeAuthRegistryAuthorityRuntime",
+    },
+    {
+      "binding": "RUNTIME_SECRET_AUTHORITY",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "RuntimeSecretAuthorityRuntime",
+    },
+    {
+      "binding": "GATEWAY_REGISTRY",
+      "service": "ohmyho-control-api-production",
+      "entrypoint": "GatewayRoutingManagementService",
+    },
+    {
+      "binding": "RUNTIME_PROBES",
+      "service": "ohmyho-control-api-production",
+      "entrypoint": "RuntimeCreditService",
+    },
+  ],
+  // WFP_API_TOKEN is a Worker secret: the Workers for Platforms API token of this namespace.
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+}

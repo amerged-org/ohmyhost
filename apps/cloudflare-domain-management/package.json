@@ -1,0 +1,44 @@
+{
+  "name": "@ohmyhost/cloudflare-domain-management",
+  "version": "0.0.0",
+  "private": true,
+  "ohmyhost": {
+    "deployment": "production",
+    "fakeProviderBoundary": {
+      "typescriptProject": "tsconfig.build.json",
+      "artifactRoot": "dist",
+      "entrypoints": [
+        "src/index.ts",
+        "src/worker-main.ts",
+        "src/production-keyring-worker.ts"
+      ],
+      "bundles": [
+        {
+          "entrypoint": "src/worker-main.ts",
+          "metafile": "dist/worker-bundle/metafile.json"
+        },
+        {
+          "entrypoint": "src/production-keyring-worker.ts",
+          "metafile": "dist/production-keyring-bundle/metafile.json"
+        }
+      ]
+    }
+  },
+  "type": "module",
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json && wrangler deploy --dry-run --outdir dist/worker-bundle --metafile dist/worker-bundle/metafile.json --config wrangler.jsonc && wrangler deploy --dry-run --outdir dist/production-keyring-bundle --metafile dist/production-keyring-bundle/metafile.json --config wrangler.keyring.production.jsonc",
+    "deploy:dry-run": "wrangler deploy --dry-run --outdir .wrangler/dry-run",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo",
+    "test": "vitest run --root ../.. apps/cloudflare-domain-management/test"
+  },
+  "dependencies": {
+    "@ohmyhost/contracts": "workspace:*",
+    "@ohmyhost/database": "workspace:*",
+    "@ohmyhost/platform": "workspace:*",
+    "@ohmyhost/project-handles": "workspace:*",
+    "@ohmyhost/provider-cloudflare": "workspace:*"
+  },
+  "devDependencies": {
+    "wrangler": "4.125.0"
+  }
+}

@@ -1,0 +1,11 @@
+ohmyho.st
+Copyright 2026 Amerged B.V.
+
+The license inventory is in licenses/manifest.json.
+The PostgreSQL bridge includes Apache-2.0 code from cloudflare-postgres.
+See packages/postgres-bridge/NOTICE and packages/postgres-bridge/LICENSE.
+Third-party software and assets retain their own license and attribution.
+
+The bundled JetBrains Mono and Space Grotesk fonts use SIL Open Font License 1.1. Their copyright and license notices are included in apps/public-site/public/fonts.
+
+Website materials include MIT-licensed code and assets from amerged-org/ohmyhost-web. The original permission notice is in licenses/MIT-ohmyhost-web.txt. Vendor-logo and font provenance is recorded in licenses/manifest.json and apps/public-site/site/ASSET-SOURCES.md.

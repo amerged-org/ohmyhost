@@ -1,0 +1,13 @@
+{
+  "name": "ohmyhost",
+  "displayName": "ohmyho.st",
+  "version": "0.1.70",
+  "description": "Develop, version, preview and publish applications with ohmyho.st.",
+  "author": {
+    "name": "Amerged B.V.",
+    "url": "https://ohmyho.st"
+  },
+  "homepage": "https://docs.ohmyho.st/",
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json"
+}

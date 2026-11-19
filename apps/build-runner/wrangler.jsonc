@@ -1,0 +1,78 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-build-runner-disabled",
+  "account_id": "00000000000000000000000000000000",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-08-19",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": {
+    "BUILD_OBJECTS_BUCKET_US": "ohmyho-builds-disabled",
+    "BUILD_OBJECTS_BUCKET_EU": "ohmyho-builds-disabled-eu",
+    "BUILD_PROJECT": "disabled",
+  },
+  "r2_buckets": [
+    {
+      "binding": "BUILD_OBJECTS_US",
+      "bucket_name": "ohmyho-builds-disabled",
+      "jurisdiction": "us",
+    },
+    {
+      "binding": "BUILD_OBJECTS_EU",
+      "bucket_name": "ohmyho-builds-disabled-eu",
+      "jurisdiction": "eu",
+    },
+  ],
+  "services": [
+    {
+      "binding": "BUILD_RECEIPTS",
+      "service": "ohmyho-control-api-disabled",
+      "entrypoint": "BuildReceiptPersistenceService",
+    },
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "BUILD_SANDBOX", "class_name": "BuildSandbox" },
+      { "name": "BUILD_SANDBOX_EU", "class_name": "BuildSandboxEu" },
+    ],
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["BuildSandbox"] },
+    { "tag": "v2", "new_sqlite_classes": ["BuildSandboxEu"] },
+  ],
+  "containers": [
+    {
+      "name": "ohmyho-build-sandbox-disabled",
+      "class_name": "BuildSandbox",
+      "image": "./sandbox/Dockerfile",
+      "image_build_context": "../..",
+      "instance_type": "standard-3",
+      "max_instances": 1,
+      "constraints": { "regions": ["ENAM", "WNAM"] },
+      // A rollout waits this long for a sandbox that is still building (5 + 8 minutes at most).
+      "rollout_active_grace_period": 900,
+    },
+    {
+      // The same image for EU projects; the jurisdiction keeps the sandbox inside the EU.
+      "name": "ohmyho-build-sandbox-disabled-eu",
+      "class_name": "BuildSandboxEu",
+      "image": "./sandbox/Dockerfile",
+      "image_build_context": "../..",
+      "instance_type": "standard-3",
+      "max_instances": 1,
+      "constraints": { "jurisdiction": "eu" },
+      "rollout_active_grace_period": 900,
+    },
+  ],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": true,
+      "persist": true,
+    },
+  },
+}

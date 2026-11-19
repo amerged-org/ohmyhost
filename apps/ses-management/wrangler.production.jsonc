@@ -1,0 +1,57 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-ses-management-production",
+  "account_id": "00000000000000000000000000000001",
+  "main": "src/resend-worker.ts",
+  "compatibility_date": "2026-08-22",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "triggers": { "crons": ["* * * * *"] },
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "vars": {
+    "RUNTIME_CONFIGURATION_STATE": "configured",
+  },
+  "services": [
+    {
+      "binding": "MAIL_MANAGEMENT_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "MailManagementRuntime",
+    },
+    {
+      "binding": "MAIL_WORKSPACE_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "MailWorkspaceRuntime",
+    },
+    {
+      "binding": "MAIL_CAPABILITY_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "MailCapabilityRuntime",
+    },
+    {
+      "binding": "MAIL_DELETION_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "MailDeletionRuntime",
+    },
+    {
+      "binding": "MAIL_COMMAND_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "MailCommandRuntime",
+    },
+    {
+      "binding": "MAIL_MANAGEMENT_JOB_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "MailManagementJobRuntime",
+    },
+    {
+      "binding": "PRODUCT_PROVIDER_AUTHORIZATION_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "ProductProviderAuthorizationRuntime",
+    },
+    {
+      "binding": "CLOUDFLARE_DOMAIN_MANAGEMENT",
+      "service": "ohmyho-cloudflare-domain-management-production",
+      "entrypoint": "CloudflareDomainManagementService",
+    },
+  ],
+}

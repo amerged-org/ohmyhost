@@ -1,0 +1,4270 @@
+import { constants } from "node:fs";
+import { lstat, open } from "node:fs/promises";
+import { isAbsolute, join, resolve } from "node:path";
+import {
+  assertManagedSourceResponse,
+  type ManagedProjectSource,
+} from "@ohmyhost/contracts/managed-sources";
+import {
+  createSourceSnapshot,
+  inspectSourceWorkspace,
+  SourceWorkspaceError,
+  type SourceWorkspace,
+} from "./source-workspace.js";
+import { publishSourceSnapshot } from "./source-publisher.js";
+import {
+  prepareLocalSourcePublication,
+  completeLocalSourcePublication,
+  inspectLocalSourcePublications,
+  LocalSourcePublicationError,
+  type LocalSourceMetadataDirectory,
+} from "./source-publication-store.js";
+import { readProjectLinks } from "./project-link-store.js";
+import {
+  parseProjectDatabaseWrite,
+  assertProjectDatabaseWriteReceipt,
+  assertProjectDatabaseAccess,
+  assertProjectDatabaseAccessCredential,
+  assertProjectDatabaseAccessPage,
+} from "@ohmyhost/contracts/database-access";
+import { assertOrganizationAccount } from "@ohmyhost/contracts/credit-pricing";
+import { assertDatabaseCompute } from "@ohmyhost/contracts/database-compute";
+import {
+  parseDatabaseScheduleSetRequest,
+  parseDatabaseWebhookCreateRequest,
+  type DatabaseScheduleSetRequest,
+} from "@ohmyhost/contracts/database-events";
+import cliPackage from "../package.json" with { type: "json" };
+import { isUserSecretName } from "@ohmyhost/contracts/secret-names";
+import {
+  assertProjectContext,
+  assertProjectNotesReceipt,
+} from "@ohmyhost/contracts/project-context";
+import {
+  assertProjectExport,
+  assertProjectExportDownloadLink,
+  EXPORT_PASSWORD_MIN_CHARACTERS,
+  exportPasswordMeetsMinimum,
+} from "@ohmyhost/contracts/project-exports";
+import {
+  prepareUserTokenFile,
+  UserTokenFileError,
+  preparePrivateSecretFile,
+  PrivateSecretFileError,
+} from "./user-token-file.js";
+import { parseUserApiKeyPage } from "@ohmyhost/contracts/user-api-keys";
+import { assertOrganizationCreditUsage } from "@ohmyhost/contracts/credit-pricing";
+import {
+  assertBillingCheckout,
+  assertBillingPortal,
+  assertRecharge,
+} from "@ohmyhost/contracts/billing";
+import type {
+  DeviceAuthorization,
+  DevicePollResult,
+  WorkosDeviceFlowClient,
+} from "@ohmyhost/workos-auth-contracts/device-flow";
+import { WorkosContractError } from "@ohmyhost/workos-auth-contracts/parsing";
+
+import {
+  InvalidCommandError,
+  parseProductCliCommand,
+  recognizedCommandLabel,
+  type RecognizedCommandLabel,
+  type ProductCliCommand,
+} from "./command.js";
+import {
+  CredentialStoreUnavailableError,
+  type CredentialStore,
+  type CurrentCredential,
+  type StoredCredential,
+} from "./credential-store.js";
+import type {
+  DatabaseTableColumnInput,
+  DatabaseTableCreateInput,
+  ProductApi,
+} from "./product-api.js";
+import {
+  parseDatabaseTableCreateRequest,
+  type DatabaseTableColumn,
+} from "@ohmyhost/contracts/database-tables";
+import {
+  defaultProfileName,
+  isProfileUserId,
+  ProfileLimitError,
+  profileLimitAction,
+  ProfileNameConflictError,
+  publicProfile,
+  type LocalProfile,
+  type ProfileRegistry,
+} from "./profile-store.js";
+import type { ProjectLinkStore } from "./project-link-store.js";
+import { DeviceTokenExpiryError, resolveDeviceTokenExpiresAt } from "./device-token-expiry.js";
+import {
+  AccountVerificationError,
+  assertVerifiedLogin,
+  chooseWorkspace,
+  InteractiveSessionRequiredError,
+  ProfileOrganizationFixedError,
+  publicWorkspace,
+  selectWorkspace,
+  workspaceOf,
+  type WorkspaceSelection,
+} from "./workspace.js";
+import {
+  parseCloudflareDnsAuthorization,
+  parseGithubConnectionAuthorization,
+  parseGithubDisconnection,
+  parseGithubOrganizationConnectionStatus,
+  parseOrganizationMcpConnectionList,
+  parseOrganizationMcpConnectionRevocation,
+  parseCloudflareDnsAuthorizationStatus,
+  parseDeploymentPlan,
+  parseProjectDataChangePlan,
+  parseCurrentIdentity,
+  parseOrganization,
+  type PublicAccount,
+  type PublicWorkspace,
+  parseOrganizationCredits,
+  parseProjectCreditBudget,
+  parseDevAccessTicket,
+  parseDevAccessState,
+  parsePoweredByFlag,
+  parseOrganizationReferral,
+  parseGuardedActionPlan,
+  parseEnvironmentSecret,
+  parseEnvironmentSecretDeletion,
+  parseEnvironmentSecretPage,
+  parseFunctionRunPage,
+  type PublicEnvironmentSecret,
+  parseOperation,
+  parseOperationEvent,
+  parseDeploymentPage,
+  parseDeploymentRecord,
+  parseProjectCreateAccepted,
+  parseProjectPage,
+  parseProjectStatus,
+  parseProjectSourceBinding,
+  parseProjectDatabaseQuery,
+  parsePaidDomain,
+  parsePaidDomainPlan,
+  parseProviderReconciliationAttempt,
+  parseSafeProblem,
+  ResponseContractError,
+} from "./runtime-contract.js";
+
+export interface CliResult {
+  readonly exitCode: number;
+  readonly stdout: string;
+  readonly stderr: string;
+}
+
+export interface DeviceAuthorizationPresenter {
+  present(input: {
+    readonly verificationUri: string;
+    /** The provider's prefilled link; the contract binds it to the same host and user code. */
+    readonly verificationUriComplete?: string;
+    readonly userCode: string;
+    readonly expiresInSeconds: number;
+  }): Promise<void>;
+}
+
+export interface TokenRevoker {
+  revoke(refreshToken: string, signal: AbortSignal): Promise<void>;
+}
+
+export interface TokenRefresher {
+  refresh(
+    refreshToken: string,
+    signal: AbortSignal,
+    workosOrganizationId?: string,
+  ): Promise<CurrentCredential>;
+}
+
+export interface DiagnosticSink {
+  record(event: {
+    readonly correlationId: string;
+    readonly category: DiagnosticCategory;
+    readonly subsystem: DiagnosticSubsystem;
+    readonly errorKind: DiagnosticErrorKind;
+  }): void;
+}
+
+export type DiagnosticCategory =
+  | "cancelled"
+  | "configuration"
+  | "credential_store"
+  | "device_authorization"
+  | "internal"
+  | "network"
+  | "provider_blocked"
+  | "remote_problem"
+  | "response_contract"
+  | "timeout";
+
+export type DiagnosticSubsystem =
+  | "authentication"
+  | "credential_store"
+  | "lifecycle"
+  | "parser"
+  | "runtime"
+  | "sdk";
+
+export type DiagnosticErrorKind =
+  | "blocked"
+  | "cancelled"
+  | "invalid_response"
+  | "network_transport"
+  | "remote_problem"
+  | "timeout"
+  | "unexpected"
+  | "unavailable";
+
+export class NetworkTransportError extends Error {
+  public constructor() {
+    super("The network transport failed.");
+    this.name = "NetworkTransportError";
+  }
+}
+
+export class LifecycleTransportError extends Error {
+  public constructor() {
+    super("The public-client lifecycle transport failed.");
+    this.name = "LifecycleTransportError";
+  }
+}
+
+export class TokenRefreshRejectedError extends Error {
+  public constructor() {
+    super("The session must be authenticated again.");
+    this.name = "TokenRefreshRejectedError";
+  }
+}
+
+export class ProviderCapabilityBlockedError extends Error {
+  public constructor() {
+    super("The provider capability is not available in this release.");
+    this.name = "ProviderCapabilityBlockedError";
+  }
+}
+
+export class SecretInputError extends Error {
+  public constructor() {
+    super("The secret input is invalid.");
+    this.name = "SecretInputError";
+  }
+}
+
+export class PublicResponseTooLargeError extends Error {
+  public constructor() {
+    super("The remote response exceeded the size limit.");
+    this.name = "PublicResponseTooLargeError";
+  }
+}
+
+export interface ProductCliDependencies {
+  readonly sourceDirectory?: string;
+  readonly sourceMetadataDirectory?: LocalSourceMetadataDirectory;
+  readonly sourceWorkspace?: () => Promise<SourceWorkspace>;
+  readonly linkedSourceProvider?: "github" | "managed";
+  readonly linkedProjectId?: string;
+  readonly apiToken?: string;
+  readonly commandPrefix: string;
+  /** One credential store for a run without saved logins; a chosen saved login uses its own. */
+  readonly credentialStore?: (kind: "native") => CredentialStore;
+  /** Saved interactive logins; login, logout, profile list and workspace binding need them. */
+  readonly profiles?: ProfileRegistry;
+  /** The saved login this run acts as, chosen before the command started and never by another run. */
+  readonly profile?: LocalProfile;
+  /** The alias `login` gives the login it adds. */
+  readonly profileName?: string;
+  /** The OHMYHOST_PROFILE binding of this process, reported by `profile list`. */
+  readonly profileBinding?: string;
+  /** Read-only `GET /v1/me`, which verifies a fresh login before anything is stored. */
+  readonly currentIdentity?: (accessToken: () => Promise<string>) => Promise<unknown>;
+  readonly deviceFlow: WorkosDeviceFlowClient;
+  readonly deviceAuthorizationPresenter: DeviceAuthorizationPresenter;
+  /** The optional parent signal bounds only the requests of that API; by default the process signal does. */
+  readonly productApi: (
+    accessToken: () => Promise<string>,
+    parentSignal?: AbortSignal,
+  ) => ProductApi;
+  /**
+   * Reads the signed-in customer's workspaces through a separate read-only dependency,
+   * keeping product mutation capabilities out of login.
+   */
+  readonly accountProfile: (accessToken: () => Promise<string>) => Promise<PublicAccount>;
+  /** Optional onboarding guidance uses only these narrow read-only SDK queries. */
+  readonly githubConnectionStatus?: (
+    accessToken: () => Promise<string>,
+    organizationId: string,
+  ) => ReturnType<ProductApi["getGithubConnection"]>;
+  readonly projectSourceStatus?: (
+    accessToken: () => Promise<string>,
+    projectId: string,
+  ) => Promise<unknown>;
+  readonly projectLinkStore: ProjectLinkStore;
+  readonly productApiOrigin: string;
+  readonly tokenRevoker: TokenRevoker;
+  readonly tokenRefresher: TokenRefresher;
+  readonly now: () => Date;
+  readonly waitUntil: (instant: Date, signal: AbortSignal) => Promise<void>;
+  readonly lifecycleTimeoutMs: number;
+  readonly createCorrelationId: () => string;
+  readonly diagnosticSink: DiagnosticSink;
+  readonly operationEventSink?: { write(value: string): void };
+  readonly readSecretValue: (signal: AbortSignal) => Promise<string>;
+  readonly spawnPsql?: (input: {
+    readonly websocketUrl: string;
+    readonly host: string;
+    readonly user: string;
+    readonly password: string;
+    readonly database: string;
+    readonly mode: "read" | "write";
+    readonly signal: AbortSignal;
+  }) => Promise<number>;
+}
+
+/** The local psql client is missing or not executable; no credential stays behind. */
+export class PsqlUnavailableError extends Error {
+  public constructor() {
+    super("The local psql client is unavailable");
+    this.name = "PsqlUnavailableError";
+  }
+}
+
+interface CliErrorDocument {
+  readonly version: 1;
+  readonly command: string;
+  readonly status: "error";
+  readonly operation_id?: string;
+  readonly error: {
+    readonly code: string;
+    readonly retryable: boolean;
+    readonly suggested_action: string;
+    readonly message?: string;
+    readonly retry_after_seconds?: number;
+    readonly request_id?: string;
+    readonly docs_url?: string;
+    /** The account the command ran as, for answers that depend on which account that is. */
+    readonly acting_as?: Readonly<Record<string, unknown>>;
+  };
+}
+
+type CommandLabel = RecognizedCommandLabel;
+type CustomerCommandLabel = Exclude<CommandLabel, "unknown" | "help" | "version">;
+
+const CLI_VERSION = cliPackage.version;
+const HELP_USAGE = Object.freeze({
+  init: "ohmyhost init [--directory PATH] [--root PATH] [--project SLUG] [--region us|eu] [--dry-run] --json (preserve existing storage jurisdiction; for new storage pass the project's region, us when omitted)",
+  login:
+    "ohmyhost login [--organization ULID] [--user USER_ID] [--profile-name NAME] --json (adds one saved login; nothing is saved unless the browser signed in as that user and organization)",
+  logout:
+    "ohmyhost logout [--profile-name NAME] [--revoke] --json (removes only the selected saved login)",
+  whoami:
+    "ohmyhost whoami [--profile-name NAME] --json (the effective user, organization and saved login)",
+  "profile list":
+    "ohmyhost profile list --json (saved logins on this computer: name, user and organization, never a token; pass --profile-name NAME or set OHMYHOST_PROFILE to choose one)",
+  "connection begin":
+    "ohmyhost connection begin --organization ULID [--project ULID --environment ULID] --idempotency-key KEY --json",
+  "connection list": "ohmyhost connection list --organization ULID --json",
+  "connection status": "ohmyhost connection status --organization ULID --request HASH --json",
+  "connection discover":
+    "ohmyhost connection discover --organization ULID [--project ULID --environment ULID] --grant ULID [--provider-organization ID] [--team ID] --json",
+  "connection import":
+    "ohmyhost connection import --organization ULID --grant ULID --project ULID --environment ULID --provider-organization ID --team ID --connection ID --idempotency-key KEY --json",
+  "connection disconnect":
+    "ohmyhost connection disconnect --organization ULID --grant ULID --idempotency-key KEY --yes --json",
+  "github connect":
+    "ohmyhost github connect --organization ULID --idempotency-key KEY --json (connect once, then link covered repositories without another browser consent)",
+  "github status": "ohmyhost github status --organization ULID --json",
+  "github disconnect":
+    "ohmyhost github disconnect --organization ULID --yes --json (Owner only; revokes the workspace GitHub connection and every repository grant under it, so auto-deploy and linked sources stop at once; the GitHub App stays installed for other workspaces, and github connect starts a new connection)",
+  "export create":
+    "ohmyhost export create --project ULID --idempotency-key KEY --stdin --json (password on stdin only; one accepted SQL ZIP per project per 24 hours)",
+  "export get":
+    "ohmyhost export get EXPORT_ULID --project ULID --json (poll the original job: progress and error only, never a download URL; once it succeeds, run 'ohmyhost export download-link' for the signed 24-hour ZIP link)",
+  "export download-link":
+    "ohmyhost export download-link EXPORT_ULID --project ULID --json (signs one audited 24-hour link of a succeeded SQL ZIP; the URL is a secret, keep it out of files and notes; each call signs another link)",
+  "credits account": "ohmyhost credits account --organization ULID --json",
+  "referral link":
+    "ohmyhost referral link --organization ULID --json (the workspace's link to share; a new user whose first workspace comes from it starts with 30 days of Paid and 1,000 credits, and its first payment gives this workspace 1,000 credits plus 30 days of Paid unless a subscription or an unbounded grant already covers it)",
+  "credits balance": "ohmyhost credits balance --organization ULID --json",
+  "billing recharge get": "ohmyhost billing recharge get --organization ULID --json",
+  "billing recharge set":
+    "ohmyhost billing recharge set --organization ULID --enabled true|false --monthly-limit-minor CENTS --revision N --idempotency-key KEY [--consent off_session_v1] --json (explicit Owner consent required before enabling)",
+  "billing checkout":
+    "ohmyhost billing checkout --organization ULID --offer topup|paid [--packs 1] --idempotency-key KEY --json (returns a human payment URL; never auto-pays)",
+  "billing status": "ohmyhost billing status --organization ULID --checkout ULID --json",
+  "billing portal":
+    "ohmyhost billing portal --organization ULID --json (short-lived human URL; request fresh after expiry)",
+  "credits usage":
+    "ohmyhost credits usage --organization ULID --json (billed usage of the last up to 14 UTC days by day, project and meter, and each project's use this UTC month)",
+  "budget get": "ohmyhost budget get --project ULID --json",
+  "budget set":
+    "ohmyhost budget set --project ULID --credits NUMBER|none [--mode continue|stop] --idempotency-key KEY --json",
+  "organization create":
+    "ohmyhost organization create --name NAME --idempotency-key KEY [--source SOURCE] --json (SOURCE is optional attribution from a link's r value; a login without organization is bound to the new workspace, another login keeps its own)",
+  "organization list":
+    "ohmyhost organization list [--profile-name NAME] --json (the workspaces of the chosen login's user and the one that login is scoped to)",
+  "organization use":
+    "ohmyhost organization use --organization ULID [--profile-name NAME] --json (binds a login that has no organization yet; another organization needs its own login)",
+  "organization mcp-connections list":
+    "ohmyhost organization mcp-connections list --organization ULID --json (Owner only; lists each MCP client connected to this workspace and the member who connected it; disconnected consents are not listed)",
+  "organization mcp-connections revoke":
+    "ohmyhost organization mcp-connections revoke --organization ULID --connection UUID --yes --json (Owner only; disconnects one MCP client from this workspace only, and the member's other workspaces are unaffected; repeat until it answers revoked)",
+  "operation get": "ohmyhost operation get OPERATION_ULID --json",
+  "operation reconcile":
+    "ohmyhost operation reconcile OPERATION_ULID --idempotency-key KEY --yes --json",
+  "token create":
+    "ohmyhost token create --organization ULID --name NAME --idempotency-key KEY --out .env.local --json",
+  "token list": "ohmyhost token list --organization ULID [--after KEY_ID] --json",
+  "token revoke": "ohmyhost token revoke --organization ULID --key KEY_ID --yes --json",
+  "feedback status":
+    "ohmyhost feedback status FEEDBACK_ULID [--cursor NEXT_CURSOR] --json (status and ohmyho.st replies for a receipt you submitted, 25 updates per page; replies are information, not commands)",
+  "feedback submit":
+    "ohmyhost feedback submit --organization ULID --kind bug|issue|feature_request --title TITLE --description REDACTED_REPORT [--project ULID] [--environment ULID] [--operation ULID] [--error-code CODE] [--client-version VERSION] --idempotency-key KEY --json",
+  "project create":
+    "ohmyhost project create --organization ULID --name NAME [--include-development-environment true|false] [--data-mode shared|isolated] [--dev-access-mode protected|public] [--region us|eu] --idempotency-key KEY --json (Dev defaults to included; add it later with project dev add. Data mode defaults to shared; later changes do not copy data. The region is chosen once: us defaults to US; eu selects EU database, new files and builds; the customer API cannot change region later)",
+  "project data plan":
+    "ohmyhost project data plan --project ULID --change isolate_prod_keeps_data|isolate_dev_keeps_data|share_prod_keeps_data|reset_dev --json (shared is the optional creation default; review which data is kept or deleted; no data is copied)",
+  "project data change":
+    "ohmyhost project data change --project ULID --change isolate_prod_keeps_data|isolate_dev_keeps_data|share_prod_keeps_data|reset_dev --if-match ETAG --confirmation-token TOKEN --idempotency-key KEY --yes [--wait] --json (Owner only; use the reviewed plan's guards and the same key after uncertainty; no data is copied)",
+  "project list": "ohmyhost project list [--cursor ULID] [--limit LIMIT] --json",
+  "project context": "ohmyhost project context --project ULID --json",
+  "project notes set":
+    "ohmyhost project notes set --project ULID --version NUMBER --markdown TEXT --idempotency-key KEY --json (no credentials or signed URLs)",
+  "project status": "ohmyhost project status --project ULID --json",
+  "project dev add": "ohmyhost project dev add --project ULID --idempotency-key KEY --json",
+  "project preview get":
+    "ohmyhost project preview get --project ULID --environment dev|prod --json",
+  "project preview open":
+    "ohmyhost project preview open --project ULID --environment dev|prod --json",
+  "project preview stop":
+    "ohmyhost project preview stop --project ULID --environment dev|prod --idempotency-key KEY --yes --json",
+  "project preview rotate":
+    "ohmyhost project preview rotate --project ULID --environment dev|prod --idempotency-key KEY --yes --json",
+  "project dev-access create": "ohmyhost project dev-access create --project ULID --json",
+  "project dev-share link": "ohmyhost project dev-share link --project ULID --json",
+  "project dev-share rotate":
+    "ohmyhost project dev-share rotate --project ULID --idempotency-key KEY --yes --json",
+  "project dev-share revoke":
+    "ohmyhost project dev-share revoke --project ULID --idempotency-key KEY --yes --json",
+  "project dev-access mode":
+    "ohmyhost project dev-access mode --project ULID --mode protected|public --idempotency-key KEY --yes --json",
+  "project flag status": "ohmyhost project flag status --project ULID --json",
+  "project flag set":
+    "ohmyhost project flag set --project ULID --enabled true|false --idempotency-key KEY --json (shows the small Powered by ohmyho.st flag on the production site; while it shows, this project's custom domain uses no domain credits and also works on Free, and each Paid period bought through Stripe adds 250 credits to the workspace, however many projects show the flag)",
+  "project handle check":
+    "ohmyhost project handle check --handle HANDLE --json (is this address free? answers with a reason and free alternatives; the address becomes HANDLE.check.omh.st)",
+  "project handle set":
+    "ohmyhost project handle set --project ULID --handle HANDLE --if-match ETAG --idempotency-key KEY --json (moves the project to a free address; the old one stops working and anyone may claim it)",
+  "database compute set":
+    "ohmyhost database compute set --project ULID --environment dev|prod --memory-mib 256|512|1024|2048|4096 --idempotency-key KEY --yes [--wait] --json\n" +
+    "  10/20/40/80/160 credits per active hour, prorated; includes 500 MiB/1/2/4/8 GiB total disk and seven-day backups. Free supports 256 MiB; larger sizes require Paid. Sleep after 300 idle seconds. No separate database CPU, network or connection charge. Smaller disk requires a separate data migration. Transitional --profile standard|performance is accepted only for legacy provider use; never combine it with --memory-mib.",
+  "database compute get":
+    "ohmyhost database compute get --project ULID [--environment dev|prod] --json",
+  "database write":
+    "ohmyhost database write --project ULID --environment dev|prod --statement-file PATH --idempotency-key KEY [--parameters-json JSON] --yes --json",
+  "database query":
+    "ohmyhost database query --project ULID --environment dev|prod --statement SQL [--parameters-json JSON] --json",
+  "database access create":
+    "ohmyhost database access create --project ULID --environment dev|prod [--mode read|write] [--ttl 5m|1h|24h|SECONDS] [--label TEXT] --yes --json\n" +
+    "  The connection URI is shown once. Use it immediately, never store it in files, notes or source, and revoke it when finished.",
+  "database access list":
+    "ohmyhost database access list --project ULID [--environment dev|prod] --json",
+  "database access revoke":
+    "ohmyhost database access revoke --project ULID --access ULID --yes --json",
+  "database watch create":
+    "ohmyhost database watch create --project ULID --environment dev|prod --table NAME [--schema public] --columns COL[,COL] [--operations insert,update,delete] --idempotency-key KEY --yes --json (publishes only the listed columns, at most 32, of each row change as the event type data.<topic> printed in this answer; the table must exist as an ordinary table of the application; a sleeping database wakes; next, subscribe with 'ohmyhost database webhook create ... --event-types data.<topic>')",
+  "database watch list":
+    "ohmyhost database watch list --project ULID [--environment dev|prod] --json (dev when omitted; a sleeping database wakes)",
+  "database watch delete":
+    "ohmyhost database watch delete --project ULID --environment dev|prod --watch ID --idempotency-key KEY --yes --json",
+  "database table create":
+    "ohmyhost database table create --project ULID --environment dev|prod --table NAME --columns-file PATH [--primary-key COL[,COL]] --idempotency-key KEY --yes --json (the table is created in the public schema as the migration role, with the same access as migration tables, so a database watch can attach later; the columns file is a UTF-8 JSON array of 1 to 64 column objects, at most 64 KiB, each with name, type and optional nullable, identity and default; types: text, integer, bigint, boolean, numeric, double precision, timestamptz, date, uuid, jsonb; identity needs integer or bigint; default now needs timestamptz and default uuid needs uuid; identical repeats answer created false; at most 100 tables, 64 columns per table)",
+  "database webhook create":
+    "ohmyhost database webhook create --project ULID --environment dev|prod --url HTTPS_URL --event-types TYPE[,TYPE] [--headers-file PATH] --idempotency-key KEY --yes --json (the signing secret is shown once in this answer; types: database.created, database.ready, database.woke, database.slept, database.suspended, database.resized, database.deleted, data.<topic> for the rows of one watched table printed by database watch create, or data.* for every watched table; a bare * is not accepted and does not include data events; the headers file is a UTF-8 JSON object of at most 8 KiB)",
+  "database webhook subscription activate":
+    "ohmyhost database webhook subscription activate --project ULID --environment dev|prod --subscription ULID --generation N --url HTTPS_URL --event-types TYPE[,TYPE] [--headers-file PATH] --out NEW_PRIVATE_FILE --idempotency-key KEY --yes --json (the secret is written privately; repeat the same key and body after uncertainty using a new output file)",
+  "database webhook subscription deactivate":
+    "ohmyhost database webhook subscription deactivate --project ULID --environment dev|prod --subscription ULID --generation N --idempotency-key KEY --yes --json",
+  "database webhook subscription status":
+    "ohmyhost database webhook subscription status --project ULID [--environment dev|prod] --subscription ULID --json",
+  "database webhook list":
+    "ohmyhost database webhook list --project ULID [--environment dev|prod] --json (dev when omitted; the secret is never listed)",
+  "database webhook get":
+    "ohmyhost database webhook get --project ULID [--environment dev|prod] --webhook ID --json",
+  "database webhook delete":
+    "ohmyhost database webhook delete --project ULID --environment dev|prod --webhook ID [--idempotency-key KEY] --yes --json (a retry with the same key and request returns the stored answer; without a key each call is new)",
+  "database webhook test":
+    "ohmyhost database webhook test --project ULID --environment dev|prod --webhook ID [--idempotency-key KEY] --yes --json (sends one signed test request to the receiver; nothing is stored; a retry with the same key and request returns the stored outcome without sending again)",
+  "database webhook deliveries":
+    "ohmyhost database webhook deliveries --project ULID [--environment dev|prod] [--webhook ID] [--limit 1..100] [--cursor CURSOR] --json",
+  "database webhook replay":
+    "ohmyhost database webhook replay --project ULID --environment dev|prod --delivery ID [--idempotency-key KEY] --yes --json (a retry with the same key and request returns the stored answer without queuing another attempt)",
+  "database schedule set":
+    "ohmyhost database schedule set --project ULID --environment dev|prod --name NAME (--cron EXPR | --every-seconds N) --statements-file PATH [--timeout-ms N] [--enabled true|false] --yes --json (runs the statements in the file, a UTF-8 JSON array of 1 to 20 SQL strings, as the runtime role of the application; cron has five fields in UTC; every-seconds is 60 to 2678400; timeout-ms is 1000 to 30000, default 10000). A project whose Stop budget is reached has its schedules disabled automatically, within about an hour of the billed usage reaching the budget: the credit service does this after its hourly pgcf pass, and Continue budgets are never touched. While the budget is reached, schedule set with enabled true and schedule run are refused with project_budget_exceeded (HTTP 402). Re-enabling is manual: raise the budget (or wait for the next UTC month) and run database schedule set --enabled true again with the schedule body (read it with schedule get).",
+  "database schedule list":
+    "ohmyhost database schedule list --project ULID [--environment dev|prod] --json (dev when omitted)",
+  "database schedule get":
+    "ohmyhost database schedule get --project ULID [--environment dev|prod] --name NAME --json",
+  "database schedule delete":
+    "ohmyhost database schedule delete --project ULID --environment dev|prod --name NAME --yes --json",
+  "database schedule runs":
+    "ohmyhost database schedule runs --project ULID [--environment dev|prod] --name NAME [--limit 1..50] --json",
+  "database schedule run":
+    "ohmyhost database schedule run --project ULID --environment dev|prod --name NAME [--idempotency-key KEY] --yes --json (queues one run now, in addition to the timer; a retry with the same key and request returns the stored answer without a second run; refused with project_budget_exceeded (HTTP 402) while the project's Stop budget is reached)",
+  "database executions":
+    "ohmyhost database executions --project ULID [--environment dev|prod] --from ISO --to ISO --granularity hour|day [--limit 1..100] [--cursor CURSOR] --json (UTC timestamps like 2026-10-30T00:00:00.000Z aligned to the granularity, at most 31 days; counts schedule runs, webhook attempts and events per hour or day; these are counters only, executions have no price of their own and the awake compute time of the database is what is billed)",
+  "database psql":
+    "ohmyhost database psql --project ULID --environment dev|prod [--mode read|write] [--ttl 5m|1h|24h|SECONDS] [--json] (starts local psql with a temporary credential and revokes it on exit)",
+  link: "ohmyhost link --project ULID --repository-owner OWNER --repository-name REPOSITORY --idempotency-key KEY --json (uses the workspace GitHub connection and waits for the source-link operation)",
+  "source auto-deploy set":
+    "ohmyhost source auto-deploy set --project ULID --branch BRANCH --enabled true|false --idempotency-key KEY --json",
+  "source auto-deploy status": "ohmyhost source auto-deploy status --project ULID --json",
+  "source inspect":
+    "ohmyhost source inspect [--directory PATH] --json (read local source and sanitized GitHub context without sign-in)",
+  "source status": "ohmyhost source status --project ULID --json",
+  "source files": "ohmyhost source files --project ULID [--commit SHA] --json",
+  "source file": "ohmyhost source file --project ULID --path PATH [--commit SHA] --json",
+  "source versions":
+    "ohmyhost source versions --project ULID [--limit 1..100] [--before SHA] --json",
+  "source diff": "ohmyhost source diff --project ULID --from SHA --to SHA --json",
+  "source upload":
+    "ohmyhost source upload --project ULID --operation ULID --json (observe the same upload after uncertainty)",
+  "source publish":
+    "ohmyhost source publish --project ULID --mode initialize|commit|switch [--directory PATH] --expected-source-generation N [--expected-source-connection ULID] [--expected-commit SHA] --message TEXT --idempotency-key KEY [--wait] --json (current files, no history import; one managed commit)",
+  "source publish complete":
+    "ohmyhost source publish complete --project ULID [--directory PATH] [--operation ULID] --json (confirm the recorded publication and save this directory's own committed base)",
+  "source initialize":
+    "ohmyhost source initialize --project ULID --template empty|vite-react --expected-source-generation N --idempotency-key KEY [--wait] --json",
+  "source restore":
+    "ohmyhost source restore --project ULID --expected-source-generation N --expected-commit SHA --restore-commit SHA --message TEXT --idempotency-key KEY [--wait] --json (restore as a new version; publication is separate)",
+  "domain cloudflare authorize":
+    "ohmyhost domain cloudflare authorize --project ULID --zone ZONE --idempotency-key KEY --json",
+  "domain cloudflare status": "ohmyhost domain cloudflare status --project ULID --json",
+  "domain cloudflare apply":
+    "ohmyhost domain cloudflare apply --project ULID --idempotency-key KEY --yes --wait --json",
+  "domain paid plan": "ohmyhost domain paid plan --project ULID --hostname HOST --json",
+  "domain paid apply":
+    "ohmyhost domain paid apply --project ULID --hostname HOST --idempotency-key KEY --yes --json",
+  "domain paid status": "ohmyhost domain paid status --project ULID --json",
+  "domain paid delete":
+    "ohmyhost domain paid delete --project ULID --hostname HOST --idempotency-key KEY --yes --json",
+  plan: "ohmyhost plan --project ULID --commit SHA [--environment dev|prod] --json",
+  deploy:
+    "ohmyhost deploy --project ULID (--plan-id ULID | --commit SHA [--environment dev|prod]) --idempotency-key KEY --yes [--wait] --json",
+  logs: "ohmyhost logs OPERATION_ULID --follow --json",
+  "deployment list":
+    "ohmyhost deployment list --project ULID [--cursor CURSOR] [--limit 1-100] --json (newest first; a returned deployment ULID is a rollback target)",
+  "deployment get": "ohmyhost deployment get --project ULID --deployment ULID --json",
+  "deployment logs":
+    "ohmyhost deployment logs --project ULID --deployment ULID [--cursor CURSOR] --json (one page of diagnostics, newest first; a next_cursor in the answer reads the older page)",
+  "rollback plan": "ohmyhost rollback plan --project ULID --deployment DEPLOYMENT_ULID --json",
+  rollback:
+    "ohmyhost rollback --project ULID --deployment DEPLOYMENT_ULID --if-match ETAG --confirmation-token TOKEN --idempotency-key KEY --yes --json",
+  "deployment promote plan":
+    "ohmyhost deployment promote plan --project ULID --deployment DEV_DEPLOYMENT_ULID --json",
+  "deployment promote":
+    "ohmyhost deployment promote --project ULID --deployment DEV_DEPLOYMENT_ULID --if-match ETAG --confirmation-token TOKEN --idempotency-key KEY --yes [--wait] --json",
+  "delete plan": "ohmyhost delete plan --project ULID --json",
+  delete:
+    "ohmyhost delete --project ULID --if-match ETAG --confirmation-token TOKEN --idempotency-key KEY --yes --json",
+  "secret list": "ohmyhost secret list --project ULID --environment ENVIRONMENT_ULID --json",
+  "function runs":
+    "ohmyhost function runs --project ULID --environment ENVIRONMENT_ULID [--limit 1-100] --json",
+  "secret set":
+    "printf '%s' \"$SECRET_VALUE\" | ohmyhost secret set NAME --project ULID --environment ENVIRONMENT_ULID --idempotency-key KEY [--profile-user USER_ID --profile-organization ULID | --token-user USER_ID --token-organization ULID] --stdin [--wait] --json (with --profile-user and --profile-organization the saved login that runs it must belong to that user and organization; with --token-user and --token-organization it runs only with an OHMYHOST_TOKEN of that user and organization, never with a saved login)",
+  auth: "ohmyhost auth config get|set --project ULID --environment ULID [--revision N --enabled true|false --signup-policy open|invite-only --application-name NAME --idempotency-key KEY] [--canonical-origin URL|primary] [--allowed-redirect-paths JSON_ARRAY --reset-password-path PATH --invitation-path PATH]; auth provider get|set --project ULID --environment ULID --provider google|github [--revision N --enabled true|false --client-id ID --idempotency-key KEY --stdin]; auth users list --project ULID --environment ULID [--limit N --cursor CURSOR --search TEXT]; auth user create|get|delete|invite|suspend|reactivate|revoke-sessions --project ULID --environment ULID [--email EMAIL | --user UUID] [--idempotency-key KEY]. Provider secrets are read only from stdin; use --json.",
+  "secret delete":
+    "ohmyhost secret delete NAME --project ULID --environment ENVIRONMENT_ULID --idempotency-key KEY [--wait] --json",
+  "mail workspace list": "ohmyhost mail workspace list --organization ULID --json",
+  "mail workspace create":
+    "ohmyhost mail workspace create --organization ULID --domain DOMAIN --sending true --idempotency-key KEY --json",
+  "mail workspace status":
+    "ohmyhost mail workspace status --organization ULID --mail-domain ULID --json",
+  "mail workspace retire":
+    "ohmyhost mail workspace retire --organization ULID --mail-domain ULID --expected-revision N --idempotency-key KEY --yes --json",
+  "mail workspace dns-authorize":
+    "ohmyhost mail workspace dns-authorize --organization ULID --mail-domain ULID --expected-revision N --zone DOMAIN --idempotency-key KEY --json",
+  "mail workspace dns-revoke":
+    "ohmyhost mail workspace dns-revoke --organization ULID --mail-domain ULID --expected-revision N --idempotency-key KEY --yes --json",
+  "mail workspace dns-status":
+    "ohmyhost mail workspace dns-status --organization ULID --mail-domain ULID --json",
+  "mail binding get": "ohmyhost mail binding get --project ULID --environment PROD_ULID --json",
+  "mail binding set":
+    "ohmyhost mail binding set --project ULID --environment PROD_ULID --mail-domain ULID --sending true --sender-addresses contact@mail.example.com,contracts@mail.example.com --default-from contracts@mail.example.com [--reply-to owner@example.com] --expected-revision N --idempotency-key KEY --json",
+  "mail binding detach":
+    "ohmyhost mail binding detach --project ULID --environment PROD_ULID --expected-revision N --idempotency-key KEY --yes --json",
+  "mail identity get": "ohmyhost mail identity get --project ULID --json",
+  "mail identity declare":
+    "ohmyhost mail identity declare --project ULID --hostname sign.example.com --idempotency-key KEY --json",
+  "mail identity verify":
+    "ohmyhost mail identity verify --project ULID --expected-revision N --idempotency-key KEY --json",
+  "mail identity revoke":
+    "ohmyhost mail identity revoke --project ULID --expected-revision N --idempotency-key KEY --yes --json",
+  "mail identity authorize":
+    "ohmyhost mail identity authorize --project ULID --expected-revision N --zone example.com --idempotency-key KEY --json",
+  "mail identity authorization-revoke":
+    "ohmyhost mail identity authorization-revoke --project ULID --expected-revision N --idempotency-key KEY --yes --json",
+  "mail identity authorization-status":
+    "ohmyhost mail identity authorization-status --project ULID --json",
+  "mail setup":
+    "ohmyhost mail setup --project ULID --environment ULID --domain DOMAIN --sending true --receiving false --idempotency-key KEY --json",
+  "mail status": "ohmyhost mail status --project ULID --environment ULID --json",
+  "mail webhook set":
+    "ohmyhost mail webhook set --project ULID --environment ULID --url HTTPS_URL --idempotency-key KEY --json",
+  "mail webhook verify":
+    "ohmyhost mail webhook verify --project ULID --environment ULID --idempotency-key KEY --json",
+  "mail webhook disable":
+    "ohmyhost mail webhook disable --project ULID --environment ULID --idempotency-key KEY --json",
+  "mail webhook rotate":
+    "ohmyhost mail webhook rotate --project ULID --environment ULID --idempotency-key KEY --yes --json (Owner only; issues a new signing secret for the same endpoint, stops the earlier secrets at once and ends receiving until the endpoint verifies the new one; the secret is returned once, so install it in Prod application secrets and never write it into files or notes)",
+  "mail messages list":
+    "ohmyhost mail messages list --project ULID --environment ULID [--after ULID] --json",
+  "mail messages get":
+    "ohmyhost mail messages get --project ULID --environment ULID --message ULID --json",
+  "mail messages retry":
+    "ohmyhost mail messages retry --project ULID --environment ULID --message ULID --idempotency-key KEY --json",
+  "mail domain set":
+    "ohmyhost mail domain set --project ULID --environment ULID --domain DOMAIN --sending true --receiving false --idempotency-key KEY --json",
+  "mail domain status": "ohmyhost mail domain status --project ULID --environment ULID --json",
+  "mail domain delete":
+    "ohmyhost mail domain delete --project ULID --environment ULID --idempotency-key KEY --yes --json",
+} satisfies Readonly<Record<CustomerCommandLabel, string>>);
+
+const HELP_COMMANDS = Object.freeze(
+  Object.entries(HELP_USAGE).map(([command, usage]) => Object.freeze({ command, usage })),
+);
+
+/**
+ * The entries a help topic selects: an exact command name, or else every command of a group such as
+ * `database`. An exact name wins, so `source publish` does not list `source publish complete`.
+ */
+const helpEntries = (topic: string | undefined) => {
+  if (topic === undefined) return HELP_COMMANDS;
+  const exact = HELP_COMMANDS.filter((entry) => entry.command === topic);
+  if (exact.length > 0) return exact;
+  const under = HELP_COMMANDS.filter((entry) => entry.command.startsWith(`${topic} `));
+  if (under.length > 0) return under;
+  // A deeper subcommand, such as `auth users list`, is documented by its longest leading group, `auth`.
+  const words = topic.split(" ");
+  const group = HELP_COMMANDS.filter((entry) => {
+    const entryWords = entry.command.split(" ");
+    return (
+      entryWords.length <= words.length && entryWords.every((word, index) => word === words[index])
+    );
+  }).sort((left, right) => right.command.split(" ").length - left.command.split(" ").length);
+  return group.slice(0, 1);
+};
+
+export const helpTopicKnown = (topic: string): boolean => helpEntries(topic).length > 0;
+
+export const cliMetadataResult = (kind: "help" | "version", topic?: string): CliResult =>
+  kind === "help"
+    ? success("help", {
+        status: "succeeded",
+        cli_version: CLI_VERSION,
+        usage: "ohmyhost <command> [options] [--profile-name NAME] --json",
+        environment:
+          "OHMYHOST_ENVIRONMENT=development|production (default: production); OHMYHOST_PROFILE=NAME binds this process to one saved login",
+        commands: helpEntries(topic),
+      })
+    : success("version", { status: "succeeded", cli_version: CLI_VERSION });
+
+/**
+ * How to correct a command the parser refused. It quotes the command's usage line only, never an
+ * argument, so a secret typed into the wrong place is not echoed back.
+ */
+export const invalidCommandAction = (argv: readonly string[], commandPrefix: string): string => {
+  const label = recognizedCommandLabel(argv);
+  if (label === "secret set" || label === "secret delete") {
+    const action = label === "secret set" ? "set" : "delete";
+    const at = argv.findIndex((value, index) => value === "secret" && argv[index + 1] === action);
+    const name = at < 0 ? undefined : argv[at + 2];
+    if (name !== undefined && !isUserSecretName(name, action))
+      return action === "set"
+        ? "Choose a customer secret name of at most 128 uppercase letters, digits and underscores, starting with a letter. OHMYHOST_* and DATABASE_URL, HYPERDRIVE, BETTER_AUTH_SECRET, BETTER_AUTH_URL, ASSETS, FILES, IMAGES and STORAGE are reserved for the platform. Rename the application's own variable and its source references; platform bindings are installed automatically. Nothing was sent; changing only the idempotency key will not help."
+        : "Choose an existing customer secret name of at most 128 uppercase letters, digits and underscores, starting with a letter. The installed platform keys OHMYHOST_STORAGE_KEY, OHMYHOST_MAIL_KEY, OHMYHOST_AI_KEY and BETTER_AUTH_SECRET cannot be deleted. Older reserved-name collisions can be removed with secret delete; deployed platform keys stay managed by ohmyho.st. Nothing was sent; changing only the idempotency key will not help.";
+  }
+  const usage = Object.hasOwn(HELP_USAGE, label)
+    ? HELP_USAGE[label as CustomerCommandLabel].split("\n")[0]
+    : undefined;
+  if (label === "help")
+    return "Unknown help topic; nothing was sent. 'ohmyhost --help --json' lists every command with its flags.";
+  if (usage === undefined)
+    return "Unknown command; nothing was sent. 'ohmyhost --help --json' lists every command with its flags. If a documented command is missing, this CLI is older than https://ohmyho.st/client-release.json: install the published version.";
+  // A required --project may come from this checkout's link; an optional one never needs it.
+  const linkable = /(?:^|\s)--project ULID/u.test(usage) && !argv.includes("--project");
+  return `The arguments of '${label}' are invalid or incomplete; nothing was sent. Usage: ${usage}.${
+    linkable
+      ? ` --project may be omitted only inside a directory linked with '${commandPrefix} link' for this OHMYHOST_ENVIRONMENT; otherwise pass --project ULID.`
+      : ""
+  }`;
+};
+
+/**
+ * The retry step after an ambiguous failure, as a clause that follows "Then" or a semicolon. A
+ * command that takes --idempotency-key repeats its change with that key. A mutation without a key
+ * (--yes but no key) may already have applied its change, so its state is read first. Any other
+ * command only reads or signs in; it keeps the general advice.
+ */
+const retryAdvice = (command: string, keyed = true): string => {
+  const usage = Object.hasOwn(HELP_USAGE, command)
+    ? HELP_USAGE[command as CustomerCommandLabel]
+    : "";
+  if (keyed && usage.includes("--idempotency-key"))
+    return "run the same command again with the same --idempotency-key; the change may already have been applied, and a new key could apply it twice";
+  if (usage.includes("--yes"))
+    return "this command has no idempotency key and the change may already have been applied; check its current state first with the matching list or get command (for example database access list --project ULID --json), and run the command again only if the change is not there";
+  return "run the same command again; this command has no idempotency key, so check its current state first if it may have changed anything";
+};
+
+/** The next step after an unexpected client failure; the stderr diagnostic line identifies it. */
+export const internalErrorAction = (command: string, keyed = true): string =>
+  `The ohmyhost client stopped on an unexpected error; the stderr line starting with [ohmyhost: identifies it. Compare 'ohmyhost --version' with https://ohmyho.st/client-release.json and install the published client if it is older, then ${retryAdvice(command, keyed)}. If the current client fails the same way, report it with feedback submit (kind bug, error code internal_error) and quote that stderr line.`;
+
+/** The local credential store or saved-login index failed; a sandbox is the usual cause. */
+export const CREDENTIAL_STORE_UNAVAILABLE_ACTION =
+  "This computer's credential store (for example macOS Keychain or Windows Credential Manager) or the saved-login list in ~/.ohmyhost/profiles could not be read or written; nothing was changed. If the agent runs in a sandbox, run the command with access to them before asking the customer to sign in again. If the store is locked, ask the customer to unlock it, then run the command again. On a server, container or CI runner without a credential store, do not run login: load OHMYHOST_TOKEN from a private env file with a token from the portal's API Tokens page.";
+
+const responseContractAction = (command: string, keyed = true): string =>
+  `The ohmyho.st API answered in a form this client version does not accept, usually because the client is older than the service. Compare 'ohmyhost --version' with https://ohmyho.st/client-release.json; if it is older, install the published CLI and MCP and reload MCP. Then ${retryAdvice(command, keyed)}. If the current version answers this too, report it with feedback submit (kind bug, error code response_contract_invalid).`;
+
+const requestTimeoutAction = (command: string, keyed = true): string =>
+  `The ohmyho.st API did not answer within 30 seconds; ${retryAdvice(command, keyed)}.`;
+
+const LOGOUT_UNCONFIRMED_ACTION =
+  "The saved login was removed from this computer, but ohmyho.st did not confirm that its session ended. Running logout again cannot retry this, because the login is gone; do not sign in again just to revoke it. Tell the customer the session end was not confirmed.";
+
+const HEADERS_FILE_INVALID_ACTION =
+  "Put one JSON object of header names and values in the file named by --headers-file: UTF-8, at most 8 KiB, unique names, values of visible ASCII characters. Names such as content-type, host, content-length, connection, transfer-encoding, user-agent, te, upgrade and expect, and names starting with pgcf-, cf- or x-forwarded-, are refused. Nothing was sent; fix the file and run the command again.";
+
+const SCHEDULE_STATEMENTS_FILE_INVALID_ACTION =
+  "Put one JSON array of 1 to 20 non-empty SQL strings in the file named by --statements-file: UTF-8, at most 64 KiB in total and 16 KiB per statement, without NUL characters. Nothing was saved; fix the file and run the command again.";
+
+const SCHEDULE_INVALID_ACTION =
+  "Check the schedule request: --cron takes five fields in UTC (9 to 120 characters), or --every-seconds takes 60 to 2678400, never both; --timeout-ms takes 1000 to 30000; the statements file must hold 1 to 20 non-blank SQL strings of at most 16 KiB each and 64 KiB in total. Nothing was saved; fix it and run the command again.";
+
+const COLUMNS_FILE_INVALID_ACTION =
+  "Put one JSON array of 1 to 64 column objects in the file named by --columns-file: UTF-8, at most 64 KiB, each with a lower-case name, a type (text, integer, bigint, boolean, numeric, double precision, timestamptz, date, uuid or jsonb) and optional nullable, identity (integer or bigint only) and default (now for timestamptz, uuid for uuid). Each --primary-key column must be one of them, at most 8 names. Nothing was created; fix the file or the flags and run the command again.";
+
+const STATEMENT_FILE_INVALID_ACTION =
+  "Put one INSERT, UPDATE or DELETE statement that starts with that keyword (no leading comment or WITH), UTF-8, at most 64 KiB, in the file named by --statement-file, then rerun with the same --idempotency-key.";
+
+/** The command that signs a saved login in again as the same user, organization and alias. */
+const signInCommand = (commandPrefix: string, profile: LocalProfile | undefined): string =>
+  profile === undefined
+    ? `${commandPrefix} login --json`
+    : `${commandPrefix} login${
+        profile.organizationId === null ? "" : ` --organization ${profile.organizationId}`
+      } --user ${profile.userId} --profile-name ${profile.name} --json`;
+
+/** The sign-in service ended a saved login, which was then removed from this computer. */
+export const endedLoginAction = (
+  commandPrefix: string,
+  profile: LocalProfile | undefined,
+): string =>
+  `The sign-in of ${
+    profile === undefined
+      ? "this computer's saved login"
+      : `saved login ${profile.name} (user ${profile.userId}${
+          profile.organizationId === null ? "" : `, organization ${profile.organizationId}`
+        })`
+  } ended and it was removed. Run '${signInCommand(commandPrefix, profile)}' to sign it in again.`;
+
+/** Renewing a saved login failed without ending it; it was kept. */
+export const refreshFailedAction = (
+  commandPrefix: string,
+  profile: LocalProfile | undefined,
+): string =>
+  `Renewing the saved login${profile === undefined ? "" : ` ${profile.name}`} at the sign-in service failed. Run the same command again in a minute, with the same --idempotency-key if it has one. If it fails again, run '${signInCommand(commandPrefix, profile)}' and send the customer the link and code.`;
+
+/** The flags a failed login is repeated with; the boundary proof needs brace-free signatures. */
+interface LoginFlags {
+  readonly organizationId: string | undefined;
+  readonly userId: string | undefined;
+  readonly profileName: string | undefined;
+}
+
+class ProductCliFailure extends Error {
+  public constructor(
+    public readonly exitCode: number,
+    public readonly code: string,
+    public readonly retryable: boolean,
+    public readonly suggestedAction: string,
+    public readonly operation?: ReturnType<typeof parseOperation>,
+  ) {
+    super(code);
+    this.name = "ProductCliFailure";
+  }
+}
+
+export class ProductCli {
+  /** The saved login of this run; binding a login without organization replaces it. */
+  #profile: LocalProfile | undefined;
+
+  public constructor(private readonly dependencies: ProductCliDependencies) {
+    this.#profile = dependencies.profile;
+  }
+
+  public async run(
+    argv: readonly string[],
+    signal = new AbortController().signal,
+  ): Promise<CliResult> {
+    let command: ProductCliCommand;
+    try {
+      command = parseProductCliCommand(argv);
+      if (command.kind === "help" && command.topic !== undefined && !helpTopicKnown(command.topic))
+        throw new InvalidCommandError();
+    } catch (error) {
+      if (error instanceof InvalidCommandError) {
+        return failure(
+          recognizedCommandLabel(argv),
+          2,
+          "invalid_command",
+          false,
+          invalidCommandAction(argv, this.dependencies.commandPrefix),
+        );
+      }
+      this.recordDiagnostic({
+        category: "internal",
+        subsystem: "parser",
+        errorKind: "unexpected",
+      });
+      return failure(
+        recognizedCommandLabel(argv),
+        1,
+        "internal_error",
+        false,
+        internalErrorAction(recognizedCommandLabel(argv)),
+      );
+    }
+    return this.runCommand(command, signal);
+  }
+
+  public async runCommand(
+    command: ProductCliCommand,
+    signal = new AbortController().signal,
+  ): Promise<CliResult> {
+    const name = parsedCommandName(command);
+    try {
+      throwIfAborted(signal);
+      if (command.kind === "help" || command.kind === "version")
+        return cliMetadataResult(command.kind, command.kind === "help" ? command.topic : undefined);
+      if (command.kind === "init") throw new ProviderCapabilityBlockedError();
+      if (command.kind === "source-inspect")
+        return success(name, {
+          status: "inspected",
+          workspace: await inspectSourceWorkspace(
+            resolve(this.dependencies.sourceDirectory ?? process.cwd(), command.directory),
+          ),
+          pending_publications: await inspectLocalSourcePublications(
+            resolve(this.dependencies.sourceDirectory ?? process.cwd(), command.directory),
+          ),
+        });
+      if (
+        command.kind === "source-read" ||
+        command.kind === "source-publish" ||
+        command.kind === "source-initialize" ||
+        command.kind === "source-restore" ||
+        command.kind === "source-complete"
+      )
+        return await this.managedSource(command, signal);
+      if (
+        this.dependencies.apiToken !== undefined &&
+        (command.kind === "organization-create" ||
+          command.kind === "organization-list" ||
+          command.kind === "organization-use")
+      ) {
+        // A user API token is bound to one workspace and cannot read the account profile.
+        throw new InteractiveSessionRequiredError();
+      }
+      if (command.kind === "profile-list") return await this.listProfiles();
+      if (command.kind === "login")
+        return await this.login(command.organizationId, command.userId, signal);
+      if (command.kind === "logout") {
+        return await this.logout(command.credentialStore, command.revoke, signal);
+      }
+      if (command.kind === "github-connect" || command.kind === "github-status") {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        if (command.kind === "github-status") {
+          const github = parseGithubOrganizationConnectionStatus(
+            await api.getGithubConnection(command.organizationId),
+          );
+          if (
+            github.connection !== null &&
+            github.connection.organization_id !== command.organizationId
+          )
+            throw new ResponseContractError();
+          return success(name, {
+            status: github.status,
+            github,
+            ...(github.status === "connected"
+              ? {}
+              : { next_action: this.githubConnectAction(command.organizationId) }),
+          });
+        }
+        const authorization = parseGithubConnectionAuthorization(await api.connectGithub(command));
+        if (
+          authorization.connection !== null &&
+          authorization.connection.organization_id !== command.organizationId
+        )
+          throw new ResponseContractError();
+        return success(name, {
+          status: authorization.status,
+          authorization,
+          ...(authorization.status === "connected"
+            ? {}
+            : {
+                next_action:
+                  authorization.status === "pending"
+                    ? "Open authorization_url in your GitHub profile, then repeat this exact command and key to observe the connection."
+                    : authorization.status === "authorizing"
+                      ? "GitHub authorization is processing. Repeat this exact command and key; do not replay the callback."
+                      : "Resolve last_failure, then run github connect for this same workspace with a new idempotency key.",
+              }),
+        });
+      }
+      if (command.kind === "github-disconnect") {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        const github = parseGithubDisconnection(await api.disconnectGithub(command.organizationId));
+        if (
+          github.connection !== null &&
+          github.connection.organization_id !== command.organizationId
+        )
+          throw new ResponseContractError();
+        return success(name, {
+          status: github.status,
+          github,
+          ...(github.status === "connected"
+            ? {}
+            : { next_action: this.githubConnectAction(command.organizationId) }),
+        });
+      }
+      if (
+        command.kind === "connection-begin" ||
+        command.kind === "connection-list" ||
+        command.kind === "connection-status" ||
+        command.kind === "connection-discover" ||
+        command.kind === "connection-import" ||
+        command.kind === "connection-disconnect"
+      ) {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        if (!api.connection) throw new ResponseContractError();
+        const result = await api.connection(command);
+        return success(name, { status: "ok", result });
+      }
+      if (command.kind === "organization-mcp-connections-list") {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        const page = parseOrganizationMcpConnectionList(
+          await api.listOrganizationMcpConnections(command.organizationId),
+        );
+        return success(name, { status: "listed", connections: page.connections });
+      }
+      if (command.kind === "organization-mcp-connection-revoke") {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        const revocation = parseOrganizationMcpConnectionRevocation(
+          await api.revokeOrganizationMcpConnection({
+            organizationId: command.organizationId,
+            connectionId: command.connectionId,
+          }),
+        );
+        return success(name, {
+          status: revocation.state,
+          revocation,
+          ...(revocation.state === "revoked"
+            ? {}
+            : {
+                next_action:
+                  "Repeat this exact command until status is revoked; the client's active provider use is still draining.",
+              }),
+        });
+      }
+      if (command.kind === "whoami") return await this.getCurrentIdentity(command, signal);
+      if (
+        command.kind === "token-create" ||
+        command.kind === "token-list" ||
+        command.kind === "token-revoke"
+      ) {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        if (command.kind === "token-list")
+          return success(name, {
+            status: "listed",
+            tokens: parseUserApiKeyPage(await api.listUserApiKeys(command)),
+          });
+        if (command.kind === "token-revoke") {
+          await api.revokeUserApiKey(command);
+          return success(name, { status: "revoked", key_id: command.keyId });
+        }
+        const file = await prepareUserTokenFile(command.outputPath);
+        try {
+          return success(name, {
+            status: "stored",
+            ...(await file.save(await api.createUserApiKey(command))),
+          });
+        } finally {
+          await file.close();
+        }
+      }
+      if (command.kind === "billing-recharge-get" || command.kind === "billing-recharge-set") {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        const recharge =
+          command.kind === "billing-recharge-get"
+            ? await api.getBillingRecharge(command.organizationId)
+            : await api.configureBillingRecharge(command);
+        try {
+          assertRecharge(recharge);
+        } catch {
+          throw new ResponseContractError();
+        }
+        return success(name, { status: "succeeded", recharge });
+      }
+      if (
+        command.kind === "billing-checkout" ||
+        command.kind === "billing-status" ||
+        command.kind === "billing-portal"
+      ) {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        const result =
+          command.kind === "billing-checkout"
+            ? await api.createBillingCheckout(command)
+            : command.kind === "billing-status"
+              ? await api.getBillingCheckout(command)
+              : await api.createBillingPortal(command.organizationId);
+        try {
+          if (command.kind === "billing-portal") assertBillingPortal(result);
+          else assertBillingCheckout(result);
+        } catch {
+          throw new ResponseContractError();
+        }
+        return success(name, { status: "succeeded", billing: result });
+      }
+      if (command.kind === "referral-link") {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        const referral = parseOrganizationReferral(
+          await api.getOrganizationReferral(command.organizationId),
+        );
+        return success("referral link", { status: "succeeded", referral });
+      }
+      if (command.kind === "credits-account") {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        const account = await api.getOrganizationAccount(command.organizationId);
+        assertOrganizationAccount(account);
+        return success("credits account", { status: "succeeded", account });
+      }
+      if (command.kind === "credits-balance") {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        return success("credits balance", {
+          status: "succeeded",
+          credits: parseOrganizationCredits(
+            await api.getOrganizationCredits(command.organizationId),
+          ),
+        });
+      }
+      if (command.kind === "credits-usage") {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        const usage = await api.getOrganizationCreditUsage(command.organizationId);
+        try {
+          assertOrganizationCreditUsage(usage);
+        } catch {
+          throw new ResponseContractError();
+        }
+        return success("credits usage", { status: "succeeded", usage });
+      }
+      if (command.kind === "budget-get" || command.kind === "budget-set") {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        const value =
+          command.kind === "budget-get"
+            ? await api.getProjectCreditBudget(command.projectId)
+            : await api.setProjectCreditBudget(command);
+        return success(command.kind === "budget-get" ? "budget get" : "budget set", {
+          status: "succeeded",
+          budget: parseProjectCreditBudget(value),
+        });
+      }
+      if (command.kind === "organization-create") {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        const organization = parseOrganization(
+          await api.createOrganization({
+            name: command.name,
+            ...(command.signupSource === undefined ? {} : { signupSource: command.signupSource }),
+            idempotencyKey: command.idempotencyKey,
+          }),
+        );
+        const selection = chooseWorkspace(
+          (await api.getAccountProfile()).organizations,
+          organization.id,
+        );
+        if (selection.outcome !== "selected")
+          throw new ProductCliFailure(
+            2,
+            "organization_not_found",
+            true,
+            `The new workspace is not yet readable for this account. Run '${this.dependencies.commandPrefix} organization use --organization ${organization.id} --json' again.`,
+          );
+        const current = this.#profile;
+        // A login in another organization keeps it: the new workspace gets its own login, so no
+        // other agent that uses this login is moved into the new workspace.
+        if (
+          current !== undefined &&
+          current.organizationId !== null &&
+          current.organizationId !== organization.id
+        )
+          return success("organization create", {
+            status: "succeeded",
+            organization,
+            selected: current.organizationId,
+            profile: publicProfile(current),
+            next_action: `Run '${this.dependencies.commandPrefix} login --organization ${organization.id} --user ${current.userId} --json' to add a login for the new workspace as the same user; profile ${current.name} stays in organization ${current.organizationId}.`,
+          });
+        // A created workspace is only usable once it is in the access token, so bind it now.
+        const profile = await this.bindOrganization(selection.organization, signal);
+        return success("organization create", {
+          status: "succeeded",
+          organization,
+          selected: organization.id,
+          profile: publicProfile(profile),
+          next_action: `Run '${this.dependencies.commandPrefix} whoami --json' to confirm the selected workspace, then create a project.`,
+          ...(await this.githubNextAction(
+            await this.authenticatedApi(command.credentialStore, signal),
+            organization.id,
+          )),
+        });
+      }
+      if (command.kind === "organization-list") {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        const account = await api.getAccountProfile();
+        return success("organization list", {
+          status: "listed",
+          organizations: account.organizations.map(publicWorkspace),
+          selected: this.#profile?.organizationId ?? null,
+        });
+      }
+      if (command.kind === "organization-use") {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        const selection = chooseWorkspace(
+          (await api.getAccountProfile()).organizations,
+          command.organizationId,
+        );
+        if (selection.outcome !== "selected") throw this.unknownWorkspace(selection);
+        const profile = await this.bindOrganization(selection.organization, signal);
+        return success("organization use", {
+          status: "selected",
+          organization: publicWorkspace(selection.organization),
+          selected: selection.organization.id,
+          profile: publicProfile(profile),
+          ...(await this.githubNextAction(
+            await this.authenticatedApi(command.credentialStore, signal),
+            selection.organization.id,
+          )),
+        });
+      }
+      if (command.kind === "operation-get") {
+        return await this.getOperation(command, signal);
+      }
+      if (command.kind === "operation-reconcile") {
+        return await this.reconcileOperation(command, signal);
+      }
+      if (command.kind === "export-create") {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        const password = await this.dependencies.readSecretValue(signal);
+        if (
+          password.trim().length === 0 ||
+          new TextEncoder().encode(password).length > 1024 ||
+          !exportPasswordMeetsMinimum(password)
+        )
+          throw new SecretInputError();
+        const operation = parseOperation(
+          await api.createProjectExport({
+            projectId: command.projectId,
+            idempotencyKey: command.idempotencyKey,
+            password,
+          }),
+        );
+        return success("export create", { status: operation.state, operation });
+      }
+      if (command.kind === "export-get") {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        const result = await api.getProjectExport({
+          projectId: command.projectId,
+          exportId: command.exportId,
+        });
+        assertProjectExport(result);
+        return success("export get", { status: result.state, export: result });
+      }
+      if (command.kind === "export-download-link") {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        const link = await api.createProjectExportDownloadLink({
+          projectId: command.projectId,
+          exportId: command.exportId,
+        });
+        assertProjectExportDownloadLink(link);
+        return success("export download-link", { status: "succeeded", download_link: link });
+      }
+      if (command.kind === "feedback-status") {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        const feedback = await api.getFeedback(command.feedbackId, command.cursor);
+        return success("feedback status", { status: "succeeded", feedback });
+      }
+      if (command.kind === "feedback-submit") {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        return success("feedback submit", {
+          status: "succeeded",
+          feedback: await api.submitFeedback(command),
+        });
+      }
+      if (command.kind === "project-create") return await this.createProject(command, signal);
+      if (command.kind === "project-data-plan") return await this.planProjectData(command, signal);
+      if (command.kind === "project-data-change")
+        return await this.changeProjectData(command, signal);
+      if (command.kind === "project-list") return await this.listProjects(command, signal);
+      if (command.kind === "project-handle-check")
+        return await this.checkProjectHandle(command, signal);
+      if (command.kind === "project-handle-set")
+        return await this.changeProjectHandle(command, signal);
+      if (command.kind === "database-compute-set") {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        let operation = parseOperation(await api.changeDatabaseCompute(command));
+        if (command.wait) operation = await this.waitForOperation(api, operation, signal);
+        return success("database compute set", {
+          status: command.wait ? "completed" : "accepted",
+          operation,
+        });
+      }
+      if (command.kind === "database-compute-get") {
+        const api = await this.authenticatedApi(command.credentialStore, signal),
+          compute = await api.getDatabaseCompute(command);
+        assertDatabaseCompute(compute);
+        return success("database compute get", { status: "succeeded", compute });
+      }
+      if (command.kind === "project-context") {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        const context = await api.getProjectContext(command.projectId);
+        assertProjectContext(context);
+        return success("project context", { status: "succeeded", context });
+      }
+      if (command.kind === "project-notes-set") {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        const notes = await api.setProjectNotes(command);
+        assertProjectNotesReceipt(notes);
+        return success("project notes set", { status: "succeeded", notes });
+      }
+      if (command.kind === "project-status") return await this.getProjectStatus(command, signal);
+      if (command.kind === "project-development-add")
+        return await this.addProjectDevelopment(command, signal);
+      if (
+        command.kind === "project-preview-get" ||
+        command.kind === "project-preview-open" ||
+        command.kind === "project-preview-stop" ||
+        command.kind === "project-preview-rotate"
+      ) {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        if (!api.preview) throw new Error("Preview unavailable");
+        const action = command.kind.slice("project-preview-".length) as
+          | "get"
+          | "open"
+          | "stop"
+          | "rotate";
+        const preview = await api.preview(action, {
+          projectId: command.projectId,
+          environment: command.environment,
+          ...("idempotencyKey" in command ? { idempotencyKey: command.idempotencyKey } : {}),
+        });
+        return success(`project preview ${action}` as RecognizedCommandLabel, {
+          status: "succeeded",
+          preview,
+        });
+      }
+      if (command.kind === "project-dev-access-create")
+        return await this.createDevAccessTicket(command, signal);
+      if (command.kind === "project-flag-status" || command.kind === "project-flag-set") {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        const flag = parsePoweredByFlag(
+          command.kind === "project-flag-status"
+            ? await api.getPoweredByFlag(command.projectId)
+            : await api.setPoweredByFlag(
+                command.projectId,
+                command.enabled,
+                command.idempotencyKey,
+              ),
+        );
+        return success(
+          command.kind === "project-flag-status" ? "project flag status" : "project flag set",
+          { status: "succeeded", flag },
+        );
+      }
+      if (
+        command.kind === "project-dev-share-link" ||
+        command.kind === "project-dev-share-rotate" ||
+        command.kind === "project-dev-share-revoke" ||
+        command.kind === "project-dev-access-mode-set"
+      ) {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        const state = parseDevAccessState(
+          command.kind === "project-dev-share-link"
+            ? await api.ensureDevShareLink(command.projectId)
+            : command.kind === "project-dev-share-rotate"
+              ? await api.rotateDevShareLink(command.projectId, command.idempotencyKey)
+              : command.kind === "project-dev-share-revoke"
+                ? await api.revokeDevShareLink(command.projectId, command.idempotencyKey)
+                : await api.setDevAccessMode(
+                    command.projectId,
+                    command.mode,
+                    command.idempotencyKey,
+                  ),
+        );
+        return success(
+          command.kind === "project-dev-share-link"
+            ? "project dev-share link"
+            : command.kind === "project-dev-share-rotate"
+              ? "project dev-share rotate"
+              : command.kind === "project-dev-share-revoke"
+                ? "project dev-share revoke"
+                : "project dev-access mode",
+          { status: "succeeded", state },
+        );
+      }
+      if (command.kind === "database-write") {
+        const statement = await readStatementFile(command.statementFile);
+        try {
+          // The statement alone decides whether the file is usable; its parameters are checked next.
+          parseProjectDatabaseWrite({
+            environment: command.environment,
+            statement,
+            parameters: [],
+          });
+        } catch {
+          throw new ProductCliFailure(
+            2,
+            "statement_file_invalid",
+            false,
+            STATEMENT_FILE_INVALID_ACTION,
+          );
+        }
+        const body = parseProjectDatabaseWrite({
+          environment: command.environment,
+          statement,
+          parameters: command.parameters,
+        });
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        const result = await api.writeProjectDatabase({
+          ...body,
+          projectId: command.projectId,
+          idempotencyKey: command.idempotencyKey,
+        });
+        assertProjectDatabaseWriteReceipt(result);
+        if (result.state === "failed")
+          return {
+            exitCode: 7,
+            stdout: `${JSON.stringify({ version: 1, command: "database write", status: "error", operation_id: result.operation_id, error: result.error })}\n`,
+            stderr: "",
+          };
+        return success("database write", {
+          status: result.state,
+          operation_id: result.operation_id,
+          result,
+        });
+      }
+      if (command.kind === "database-query")
+        return await this.queryProjectDatabase(command, signal);
+      if (command.kind === "database-access-create")
+        return await this.createDatabaseAccess(command, signal);
+      if (command.kind === "database-access-list")
+        return await this.listDatabaseAccess(command, signal);
+      if (command.kind === "database-access-revoke")
+        return await this.revokeDatabaseAccess(command, signal);
+      if (command.kind === "database-watch-create")
+        return await this.createDatabaseWatch(command, signal);
+      if (command.kind === "database-watch-list")
+        return await this.listDatabaseWatches(command, signal);
+      if (command.kind === "database-watch-delete")
+        return await this.deleteDatabaseWatch(command, signal);
+      if (command.kind === "database-table-create")
+        return await this.createDatabaseTable(command, signal);
+      if (command.kind === "database-webhook-create")
+        return await this.createDatabaseWebhook(command, signal);
+      if (
+        command.kind === "database-webhook-subscription-activate" ||
+        command.kind === "database-webhook-subscription-deactivate" ||
+        command.kind === "database-webhook-subscription-status"
+      )
+        return await this.databaseWebhookSubscription(command, signal);
+      if (command.kind === "database-webhook-list")
+        return await this.listDatabaseWebhooks(command, signal);
+      if (command.kind === "database-webhook-get")
+        return await this.getDatabaseWebhook(command, signal);
+      if (command.kind === "database-webhook-delete")
+        return await this.deleteDatabaseWebhook(command, signal);
+      if (command.kind === "database-webhook-test")
+        return await this.testDatabaseWebhook(command, signal);
+      if (command.kind === "database-webhook-deliveries")
+        return await this.listDatabaseWebhookDeliveries(command, signal);
+      if (command.kind === "database-webhook-replay")
+        return await this.replayDatabaseWebhookDelivery(command, signal);
+      if (command.kind === "database-schedule-set")
+        return await this.setDatabaseSchedule(command, signal);
+      if (command.kind === "database-schedule-list")
+        return await this.listDatabaseSchedules(command, signal);
+      if (command.kind === "database-schedule-get")
+        return await this.getDatabaseSchedule(command, signal);
+      if (command.kind === "database-schedule-delete")
+        return await this.deleteDatabaseSchedule(command, signal);
+      if (command.kind === "database-schedule-runs")
+        return await this.listDatabaseScheduleRuns(command, signal);
+      if (command.kind === "database-schedule-run")
+        return await this.runDatabaseSchedule(command, signal);
+      if (command.kind === "database-executions")
+        return await this.getDatabaseExecutionUsage(command, signal);
+      if (command.kind === "database-psql") return await this.runProjectPsql(command, signal);
+      if (command.kind === "link") return await this.linkSource(command, signal);
+      if (command.kind === "source-auto-deploy-set")
+        return await this.configureAutoDeploy(command, signal);
+      if (command.kind === "source-auto-deploy-status")
+        return await this.getAutoDeploy(command, signal);
+      if (command.kind === "domain-cloudflare-authorize")
+        return await this.authorizeCloudflareDns(command, signal);
+      if (command.kind === "domain-cloudflare-status")
+        return await this.getCloudflareDnsStatus(command, signal);
+      if (command.kind === "domain-cloudflare-apply")
+        return await this.applyProjectDomains(command, signal);
+      if (command.kind === "paid-domain-plan") return await this.planPaidDomain(command, signal);
+      if (command.kind === "paid-domain-apply") return await this.applyPaidDomain(command, signal);
+      if (command.kind === "paid-domain-status") return await this.getPaidDomain(command, signal);
+      if (command.kind === "paid-domain-delete")
+        return await this.deletePaidDomain(command, signal);
+      if (command.kind === "plan") return await this.planDeployment(command, signal);
+      if (command.kind === "deploy") return await this.deploy(command, signal);
+      if (command.kind === "logs") return await this.logs(command, signal);
+      if (command.kind === "deployment-logs") return await this.deploymentLogs(command, signal);
+      if (command.kind === "deployment-list") return await this.listDeployments(command, signal);
+      if (command.kind === "deployment-get") return await this.getDeployment(command, signal);
+      if (command.kind === "rollback-plan") return await this.planRollback(command, signal);
+      if (command.kind === "rollback") return await this.rollback(command, signal);
+      if (command.kind === "promotion-plan") return await this.planPromotion(command, signal);
+      if (command.kind === "promote") return await this.promote(command, signal);
+      if (command.kind === "delete-plan") return await this.planDelete(command, signal);
+      if (command.kind === "delete") return await this.deleteProject(command, signal);
+      if (command.kind === "secret-list") return await this.listEnvironmentSecrets(command, signal);
+      if (command.kind === "function-runs") return await this.listFunctionRuns(command, signal);
+      if (command.kind === "secret-set") return await this.putEnvironmentSecret(command, signal);
+      if (command.kind === "native-auth") {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        if (!api.nativeAuth) throw new Error("Native Auth unavailable");
+        if (command.stdin && command.request.action === "provider_set") {
+          const secret = await this.dependencies.readSecretValue(signal);
+          const bytes = new TextEncoder().encode(secret);
+          if (bytes.length === 0 || bytes.length > 5120) {
+            bytes.fill(0);
+            throw new SecretInputError();
+          }
+          try {
+            return success("auth", {
+              auth: await api.nativeAuth({ ...command.request, clientSecret: secret }),
+            });
+          } finally {
+            bytes.fill(0);
+          }
+        }
+        return success("auth", { auth: await api.nativeAuth(command.request) });
+      }
+      if (command.kind === "shared-mail") {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        if (!api.sharedMail) throw new Error("Shared mail unavailable");
+        return success(command.label, { mail: await api.sharedMail(command.request) });
+      }
+      if (command.kind === "managed-mail") {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        if (!api.managedMail) throw new Error("Mail unavailable");
+        return success(command.label, { mail: await api.managedMail(command.request) });
+      }
+      if (command.kind === "secret-delete")
+        return await this.deleteEnvironmentSecret(command, signal);
+      throw new Error("Unsupported command");
+    } catch (error) {
+      if (error instanceof UserTokenFileError || error instanceof PrivateSecretFileError)
+        return failure(name, 3, error.code, false, error.message);
+      if (error instanceof InteractiveSessionRequiredError)
+        return failure(
+          name,
+          2,
+          "interactive_login_required",
+          false,
+          `A user API token cannot create, list or select a workspace. Run '${this.dependencies.commandPrefix} login --json' in a process without OHMYHOST_TOKEN.`,
+        );
+      if (error instanceof ProfileLimitError)
+        return failure(
+          name,
+          2,
+          "profile_limit_reached",
+          false,
+          profileLimitAction(this.dependencies.commandPrefix),
+        );
+      this.recordDiagnostic(diagnosticDescriptor(error, signal));
+      return classifyFailure(
+        name,
+        error,
+        signal,
+        this.context(),
+        // A mutation parsed without its optional --idempotency-key has no key to repeat with.
+        !("idempotencyKey" in command && command.idempotencyKey === null),
+      );
+    }
+  }
+
+  private githubConnectAction(organizationId: string): string {
+    return `Run '${this.dependencies.commandPrefix} github connect --organization ${organizationId} --idempotency-key KEY --json' once, then link repositories covered by the installation.`;
+  }
+
+  private async githubNextAction(
+    api: Pick<ProductApi, "getGithubConnection"> & {
+      readonly managedSource?: Pick<NonNullable<ProductApi["managedSource"]>, "getSource">;
+    },
+    organizationId: string,
+  ): Promise<Readonly<Record<string, string>>> {
+    // Optional onboarding guidance must not turn a completed login into failure when
+    // a scoped key cannot read source connections or the status endpoint is unavailable.
+    try {
+      let provider = this.dependencies.linkedSourceProvider;
+      if (this.dependencies.linkedProjectId !== undefined) {
+        if (api.managedSource === undefined) return {};
+        const binding = await api.managedSource.getSource(this.dependencies.linkedProjectId);
+        if (binding !== null) parseProjectSourceBinding(binding);
+        provider =
+          binding === null ? undefined : (binding as { provider: "github" | "managed" }).provider;
+      }
+      if (provider === "managed") return {};
+      if (provider !== "github" && this.dependencies.sourceWorkspace !== undefined) {
+        const workspace = await this.dependencies.sourceWorkspace();
+        if (!workspace.git?.remotes.some((remote) => remote.githubRepository !== null))
+          return {
+            next_action:
+              "Ask once whether to deploy directly with ohmyho.st storing the versions or set up GitHub for this project. Inspect current source first; a missing GitHub connection does not require GitHub.",
+          };
+      }
+      const github = parseGithubOrganizationConnectionStatus(
+        await api.getGithubConnection(organizationId),
+      );
+      if (github.connection !== null && github.connection.organization_id !== organizationId)
+        throw new ResponseContractError();
+      return github.status === "connected"
+        ? {}
+        : { next_action: this.githubConnectAction(organizationId) };
+    } catch {
+      return {};
+    }
+  }
+
+  private async getCurrentIdentity(
+    command: Extract<ProductCliCommand, { kind: "whoami" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const identity = parseCurrentIdentity(await api.getCurrentIdentity());
+    // A session signed in before a workspace could be selected carries none, and then every
+    // project call answers with an empty page that reads like an empty account. Repair it here,
+    // where an agent looks first, instead of leaving the emptiness to be misread later.
+    if (identity.organization_ids.length > 0 || this.dependencies.apiToken !== undefined)
+      return success("whoami", {
+        status: "authenticated",
+        identity,
+        context: this.context(),
+        ...(identity.organization_ids.length === 1 && identity.organization_ids[0] !== undefined
+          ? await this.githubNextAction(api, identity.organization_ids[0])
+          : {}),
+      });
+    const selection = chooseWorkspace((await api.getAccountProfile()).organizations, undefined);
+    if (selection.outcome === "selected") {
+      await this.bindOrganization(selection.organization, signal);
+      return success("whoami", {
+        status: "authenticated",
+        identity: parseCurrentIdentity(await api.getCurrentIdentity()),
+        organization: publicWorkspace(selection.organization),
+        selected: selection.organization.id,
+        context: this.context(),
+        ...(await this.githubNextAction(api, selection.organization.id)),
+      });
+    }
+    return success("whoami", {
+      status: "authenticated",
+      identity,
+      context: this.context(),
+      organizations:
+        selection.outcome === "choice_required" ? selection.organizations.map(publicWorkspace) : [],
+      next_action: this.workspaceAction(selection),
+    });
+  }
+
+  /** Which account this run acts as, without any credential. */
+  private context(): Readonly<Record<string, unknown>> {
+    if (this.dependencies.apiToken !== undefined) return { credential: "environment_token" };
+    return {
+      credential: "profile",
+      profile: this.#profile === undefined ? null : publicProfile(this.#profile),
+    };
+  }
+
+  /** The next step for a login that has no organization yet. */
+  private workspaceAction(selection: WorkspaceSelection): string {
+    const prefix = this.dependencies.commandPrefix;
+    const named = this.#profile === undefined ? "" : ` --profile-name ${this.#profile.name}`;
+    return selection.outcome === "choice_required"
+      ? `Ask the customer which workspace to use, then run '${prefix} organization use --organization ULID${named} --json'.`
+      : `Run '${prefix} organization create --name NAME --idempotency-key KEY${named} --json' to create the first workspace.`;
+  }
+
+  private async listProfiles(): Promise<CliResult> {
+    const profiles = this.dependencies.profiles;
+    if (profiles === undefined) throw new ProviderCapabilityBlockedError();
+    return success("profile list", {
+      status: "listed",
+      profiles: (await profiles.list()).map(publicProfile),
+      bound: this.dependencies.profileBinding ?? null,
+      environment_token: this.dependencies.apiToken !== undefined,
+    });
+  }
+
+  private recordDiagnostic(
+    event: Omit<Parameters<DiagnosticSink["record"]>[0], "correlationId">,
+  ): void {
+    try {
+      this.dependencies.diagnosticSink.record({
+        correlationId: this.dependencies.createCorrelationId(),
+        ...event,
+      });
+    } catch {
+      // Diagnostics are best-effort and must never replace the stable command result.
+    }
+  }
+
+  // The reviewed boundary proof parses this signature, so keep its parameters brace-free.
+  private async login(
+    organizationId: string | undefined,
+    expectedUserId: string | undefined,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const profiles = this.dependencies.profiles;
+    const readIdentity = this.dependencies.currentIdentity;
+    if (profiles === undefined || readIdentity === undefined)
+      throw new ProviderCapabilityBlockedError();
+    // A device code lives five minutes and the provider offers no way to lengthen it, so the
+    // sign-in outlives the code instead: while this window lasts, a lapsed code is replaced.
+    const signInDeadline = this.dependencies.now().getTime() + SIGN_IN_WINDOW_MS;
+    let session = await this.dependencies.deviceFlow.authorize();
+    await presentAuthorization(
+      this.dependencies.deviceAuthorizationPresenter,
+      session.authorization,
+    );
+    await this.dependencies.waitUntil(
+      new Date(this.dependencies.now().getTime() + session.authorization.intervalSeconds * 1_000),
+      signal,
+    );
+    for (;;) {
+      throwIfAborted(signal);
+      let result: DevicePollResult;
+      try {
+        result = await session.poll();
+      } catch (error) {
+        // A timer may fire a fraction before the instant it was given, and the session then
+        // refuses the poll. That is not a failed sign-in: wait out the interval and ask again,
+        // instead of telling the customer their authorization failed before anyone was asked.
+        if (!(error instanceof WorkosContractError)) throw error;
+        // The code aged out while the customer was still on their way. Nobody refused, so issue
+        // the next one and show it, rather than ending a sign-in that can still succeed.
+        if (error.code === "expired_token" && this.dependencies.now().getTime() < signInDeadline) {
+          session = await this.dependencies.deviceFlow.authorize();
+          await presentAuthorization(
+            this.dependencies.deviceAuthorizationPresenter,
+            session.authorization,
+          );
+          await this.dependencies.waitUntil(
+            new Date(
+              this.dependencies.now().getTime() + session.authorization.intervalSeconds * 1_000,
+            ),
+            signal,
+          );
+          continue;
+        }
+        if (error.code !== "poll_too_soon") throw error;
+        await this.dependencies.waitUntil(
+          new Date(
+            this.dependencies.now().getTime() + session.authorization.intervalSeconds * 1_000,
+          ),
+          signal,
+        );
+        continue;
+      }
+      throwIfAborted(signal);
+      if (result.state === "pending") {
+        await this.dependencies.waitUntil(result.nextPollAt, signal);
+        continue;
+      }
+      let expiresAt: string;
+      try {
+        expiresAt = resolveDeviceTokenExpiresAt(
+          result.tokens.accessToken,
+          result.tokens.expiresInSeconds,
+          this.dependencies.now(),
+        );
+      } catch (error) {
+        if (!(error instanceof DeviceTokenExpiryError)) throw error;
+        throw new ProductCliFailure(
+          4,
+          "device_token_expiry_missing",
+          false,
+          "Run login again; the authorization response was incomplete.",
+        );
+      }
+      // Nothing is stored before the browser's account is verified, so a wrong, refused or
+      // cancelled sign-in leaves every saved login, and every command using one, as it was.
+      const signedIn: CurrentCredential = {
+        accessToken: result.tokens.accessToken,
+        refreshToken: result.tokens.refreshToken,
+        expiresAt,
+      };
+      const account = await this.dependencies.accountProfile(async () => signedIn.accessToken);
+      // A failed verification repeats this login with the flags it was given.
+      const loginFlags = {
+        organizationId,
+        userId: expectedUserId,
+        profileName: this.dependencies.profileName,
+      };
+      if (!isProfileUserId(account.userId)) throw this.unverifiedLogin(loginFlags);
+      if (expectedUserId !== undefined && account.userId !== expectedUserId)
+        throw new ProductCliFailure(
+          4,
+          "login_account_mismatch",
+          false,
+          `The browser signed in as user ${account.userId}, not ${expectedUserId}. Nothing was saved and every saved login is unchanged. Sign out of ohmyho.st in that browser or use the browser profile of ${expectedUserId}, then run '${this.dependencies.commandPrefix} login${organizationId === undefined ? "" : ` --organization ${organizationId}`} --user ${expectedUserId} --json' again.`,
+        );
+      const selection = chooseWorkspace(account.organizations, organizationId);
+      if (selection.outcome === "not_a_member") throw this.unknownWorkspace(selection);
+      // The workspace lives in the access token, so a chosen one is requested before storing.
+      const credential =
+        selection.outcome === "selected"
+          ? await runBounded(
+              (bounded) =>
+                this.dependencies.tokenRefresher.refresh(
+                  signedIn.refreshToken,
+                  bounded,
+                  selection.organization.workos_id,
+                ),
+              signal,
+              this.dependencies.lifecycleTimeoutMs,
+            )
+          : signedIn;
+      const identity = await readIdentity(async () => credential.accessToken);
+      const scopedId =
+        selection.outcome === "selected"
+          ? selection.organization.id
+          : (parseCurrentIdentity(identity).organization_ids[0] ?? null);
+      const organization =
+        scopedId === null
+          ? null
+          : account.organizations.find((candidate) => candidate.id === scopedId);
+      if (organization === undefined) throw this.unverifiedLogin(loginFlags);
+      try {
+        assertVerifiedLogin(identity, account.userId, scopedId);
+      } catch (error) {
+        if (error instanceof AccountVerificationError) throw this.unverifiedLogin(loginFlags);
+        throw error;
+      }
+      const login = {
+        userId: account.userId,
+        organizationId: scopedId,
+        organizationName: organization?.name ?? null,
+      };
+      const profile: LocalProfile = {
+        name: this.dependencies.profileName ?? defaultProfileName(await profiles.list(), login),
+        ...login,
+      };
+      try {
+        await profiles.save(
+          profile,
+          organization === null
+            ? credential
+            : {
+                ...credential,
+                workosOrganizationId: organization.workos_id,
+                organizationId: organization.id,
+              },
+        );
+      } catch (error) {
+        if (!(error instanceof ProfileNameConflictError)) throw error;
+        throw new ProductCliFailure(
+          2,
+          "profile_name_conflict",
+          false,
+          `The name ${profile.name} already belongs to the saved login of user ${error.profile.userId} in organization ${String(error.profile.organizationId ?? "none")}. Nothing was saved. Choose another --profile-name, or remove that login with '${this.dependencies.commandPrefix} logout --profile-name ${profile.name} --json' first.`,
+        );
+      }
+      this.#profile = profile;
+      const readGithubConnection = this.dependencies.githubConnectionStatus;
+      const readProjectSource = this.dependencies.projectSourceStatus;
+      if (organization !== null)
+        return success("login", {
+          status: "authenticated",
+          organization: publicWorkspace(organization),
+          profile: publicProfile(profile),
+          ...(readGithubConnection === undefined
+            ? {}
+            : await this.githubNextAction(
+                {
+                  ...(readProjectSource === undefined
+                    ? {}
+                    : {
+                        managedSource: {
+                          getSource: (selectedProjectId) =>
+                            readProjectSource(
+                              async () => credential.accessToken,
+                              selectedProjectId,
+                            ),
+                        },
+                      }),
+                  getGithubConnection: (selectedOrganizationId) =>
+                    readGithubConnection(
+                      async () => credential.accessToken,
+                      selectedOrganizationId,
+                    ),
+                },
+                organization.id,
+              )),
+        });
+      return success("login", {
+        status: "authenticated",
+        organization: null,
+        profile: publicProfile(profile),
+        organizations:
+          selection.outcome === "choice_required"
+            ? selection.organizations.map(publicWorkspace)
+            : [],
+        next_action: this.workspaceAction(selection),
+      });
+    }
+  }
+
+  /** The provider answered with another account than the one this login requested. */
+  private unverifiedLogin(flags: LoginFlags): ProductCliFailure {
+    return new ProductCliFailure(
+      4,
+      "login_verification_failed",
+      true,
+      `The signed-in account could not be verified; nothing was saved. Run '${this.dependencies.commandPrefix} login${
+        flags.organizationId === undefined ? "" : ` --organization ${flags.organizationId}`
+      }${flags.userId === undefined ? "" : ` --user ${flags.userId}`}${
+        flags.profileName === undefined ? "" : ` --profile-name ${flags.profileName}`
+      } --json' again with the same flags and send the customer the new link and code.`,
+    );
+  }
+
+  /**
+   * Bind the login of this run, which has no organization yet, to one of its user's organizations.
+   * A login that already has one keeps it; another organization is its own login.
+   */
+  private async bindOrganization(
+    organization: PublicWorkspace,
+    signal: AbortSignal,
+  ): Promise<LocalProfile> {
+    const profiles = this.dependencies.profiles;
+    const profile = this.#profile;
+    if (profiles === undefined || profile === undefined)
+      throw new InteractiveSessionRequiredError();
+    let bound: LocalProfile;
+    try {
+      bound = await runBounded(
+        (bounded) =>
+          selectWorkspace(
+            {
+              store: profiles.credential(profile),
+              refresher: this.dependencies.tokenRefresher,
+              profiles,
+              profile,
+            },
+            organization,
+            bounded,
+            (accessToken) =>
+              this.dependencies.productApi(async () => accessToken).getCurrentIdentity(),
+          ),
+        signal,
+        this.dependencies.lifecycleTimeoutMs,
+      );
+    } catch (error) {
+      if (error instanceof AccountVerificationError)
+        throw this.unverifiedLogin({
+          organizationId: organization.id,
+          userId: profile.userId,
+          profileName: profile.name,
+        });
+      if (!(error instanceof ProfileOrganizationFixedError)) throw error;
+      throw new ProductCliFailure(
+        2,
+        "profile_organization_fixed",
+        false,
+        `Profile ${profile.name} stays signed in to organization ${String(profile.organizationId)}. Run '${this.dependencies.commandPrefix} login --organization ${organization.id} --user ${profile.userId} --json' to add a separate login for ${organization.id} as the same user; a saved login never switches organizations.`,
+      );
+    }
+    this.#profile = bound;
+    return bound;
+  }
+
+  private unknownWorkspace(selection: WorkspaceSelection): ProductCliFailure {
+    return new ProductCliFailure(
+      2,
+      "organization_not_found",
+      false,
+      `You are not a member of that workspace. Run '${this.dependencies.commandPrefix} organization list --json' and choose one of ${String(selection.outcome === "not_a_member" ? selection.organizations.length : 0)}.`,
+    );
+  }
+
+  private async logout(
+    credentialStore: "native",
+    revoke: boolean,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const store = this.store(credentialStore);
+    const removed = this.#profile === undefined ? {} : { profile: publicProfile(this.#profile) };
+    if (!revoke) {
+      await this.forgetLogin(store);
+      return success("logout", { status: "logged_out", ...removed });
+    }
+    const credential = await store.read();
+    let revocationError: unknown;
+    try {
+      if (credential !== undefined) {
+        await runBounded(
+          (bounded) => this.dependencies.tokenRevoker.revoke(credential.refreshToken, bounded),
+          signal,
+          this.dependencies.lifecycleTimeoutMs,
+        );
+      }
+    } catch (error) {
+      revocationError = error;
+    } finally {
+      await this.forgetLogin(store);
+    }
+    if (revocationError !== undefined) {
+      if (isCancellation(revocationError) && signal.aborted) throw revocationError;
+      if (revocationError instanceof ProviderCapabilityBlockedError) {
+        throw new ProductCliFailure(
+          9,
+          "blocked_prerequisite",
+          false,
+          "Remote token revocation is not available in this release.",
+        );
+      }
+      // The login is already gone, so nothing this computer holds can repeat the revocation.
+      if (isTimeout(revocationError)) {
+        throw new ProductCliFailure(8, "request_timeout", false, LOGOUT_UNCONFIRMED_ACTION);
+      }
+      if (revocationError instanceof LifecycleTransportError) {
+        throw new ProductCliFailure(6, "token_revocation_failed", false, LOGOUT_UNCONFIRMED_ACTION);
+      }
+      throw revocationError;
+    }
+    return success("logout", { status: "logged_out", ...removed });
+  }
+
+  /** The credential store of this run's saved login; it follows a binding made during the run. */
+  private store(kind: "native"): CredentialStore {
+    const profiles = this.dependencies.profiles;
+    if (profiles !== undefined && this.#profile !== undefined)
+      return profiles.credential(this.#profile);
+    if (this.dependencies.credentialStore === undefined)
+      throw new ProductCliFailure(5, "authentication_required", false, this.loginAction());
+    return this.dependencies.credentialStore(kind);
+  }
+
+  /** Removes only this run's saved login; every other saved login stays untouched. */
+  private async forgetLogin(store: CredentialStore): Promise<void> {
+    const profiles = this.dependencies.profiles;
+    if (profiles !== undefined && this.#profile !== undefined) await profiles.remove(this.#profile);
+    else await store.clear();
+  }
+
+  /** How to sign this run's login in again, naming its organization and alias when known. */
+  private loginAction(): string {
+    const profile = this.#profile;
+    return `Run '${this.dependencies.commandPrefix} login${
+      profile?.organizationId === undefined || profile.organizationId === null
+        ? ""
+        : ` --organization ${profile.organizationId}`
+    }${profile === undefined ? "" : ` --profile-name ${profile.name}`} --json'.`;
+  }
+
+  private async getOperation(
+    command: Extract<ProductCliCommand, { kind: "operation-get" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const operation = parseOperation(await api.getOperation(command.operationId));
+    return success("operation get", { status: "succeeded", operation });
+  }
+
+  private async reconcileOperation(
+    command: Extract<ProductCliCommand, { kind: "operation-reconcile" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const reconciliation = parseProviderReconciliationAttempt(
+      await api.reconcileOperation({
+        operationId: command.operationId,
+        idempotencyKey: command.idempotencyKey,
+      }),
+    );
+    return success("operation reconcile", { status: "accepted", reconciliation });
+  }
+
+  private async planProjectData(
+    command: Extract<ProductCliCommand, { kind: "project-data-plan" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    return success("project data plan", {
+      status: "planned",
+      plan: parseProjectDataChangePlan(
+        await api.planProjectDataChange({ projectId: command.projectId, change: command.change }),
+      ),
+    });
+  }
+  private async changeProjectData(
+    command: Extract<ProductCliCommand, { kind: "project-data-change" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    let operation = parseOperation(
+      await api.createProjectDataChange({
+        projectId: command.projectId,
+        change: command.change,
+        ifMatch: command.ifMatch,
+        confirmationToken: command.confirmationToken,
+        idempotencyKey: command.idempotencyKey,
+      }),
+    );
+    if (command.wait) operation = await this.waitForOperation(api, operation, signal);
+    return success("project data change", {
+      status: command.wait ? "completed" : "accepted",
+      operation,
+    });
+  }
+  private async createProject(
+    command: Extract<ProductCliCommand, { kind: "project-create" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const accepted = parseProjectCreateAccepted(
+      await api.createProject({
+        organizationId: command.organizationId,
+        name: command.name,
+        ...(command.dataMode === undefined ? {} : { dataMode: command.dataMode }),
+        ...(command.devAccessMode === undefined ? {} : { devAccessMode: command.devAccessMode }),
+        ...(command.includeDevelopmentEnvironment === undefined
+          ? {}
+          : { includeDevelopmentEnvironment: command.includeDevelopmentEnvironment }),
+        ...(command.region === undefined ? {} : { region: command.region }),
+        idempotencyKey: command.idempotencyKey,
+      }),
+    );
+    return success("project create", {
+      status: "accepted",
+      project_id: accepted.project_id,
+      operation: accepted.operation,
+      next_action: `Run '${this.dependencies.commandPrefix} operation get ${accepted.operation.id} --json' until it succeeds; the new project is ${accepted.project_id}. A retry with the same idempotency key returns the same project_id.`,
+    });
+  }
+
+  private async listProjects(
+    command: Extract<ProductCliCommand, { kind: "project-list" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const projects = parseProjectPage(
+      await api.listProjects({
+        ...(command.cursor === undefined ? {} : { cursor: command.cursor }),
+        limit: command.limit,
+      }),
+    );
+    return success("project list", { status: "succeeded", projects });
+  }
+
+  private async changeProjectHandle(
+    command: Extract<ProductCliCommand, { kind: "project-handle-set" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const operation = parseOperation(
+      await api.changeProjectHandle({
+        projectId: command.projectId,
+        handle: command.handle,
+        ifMatch: command.ifMatch,
+        idempotencyKey: command.idempotencyKey,
+      }),
+    );
+    return success("project handle set", { status: "accepted", operation });
+  }
+
+  private async checkProjectHandle(
+    command: Extract<ProductCliCommand, { kind: "project-handle-check" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const handle = await api.checkProjectHandle({ handle: command.handle });
+    return success("project handle check", { status: "succeeded", handle });
+  }
+
+  private async getProjectStatus(
+    command: Extract<ProductCliCommand, { kind: "project-status" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const project = parseProjectStatus(await api.getProjectStatus(command.projectId));
+    return success("project status", { status: "succeeded", project, context: this.context() });
+  }
+
+  private async addProjectDevelopment(
+    command: Extract<ProductCliCommand, { kind: "project-development-add" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const operation = parseOperation(
+      await api.addProjectDevelopmentEnvironment({
+        projectId: command.projectId,
+        idempotencyKey: command.idempotencyKey,
+      }),
+    );
+    return success("project dev add", { status: "accepted", operation });
+  }
+
+  private async createDevAccessTicket(
+    command: Extract<ProductCliCommand, { kind: "project-dev-access-create" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const ticket = parseDevAccessTicket(await api.createDevAccessTicket(command.projectId));
+    return success("project dev-access create", { status: "succeeded", ticket });
+  }
+
+  private async queryProjectDatabase(
+    command: Extract<ProductCliCommand, { kind: "database-query" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const result = parseProjectDatabaseQuery(
+      await api.queryProjectDatabase({
+        projectId: command.projectId,
+        environment: command.environment,
+        statement: command.statement,
+        parameters: command.parameters,
+      }),
+    );
+    return success("database query", { status: "succeeded", result });
+  }
+
+  /** The credential crosses this process once; only its metadata is ever printed again. */
+  private async createDatabaseAccess(
+    command: Extract<ProductCliCommand, { kind: "database-access-create" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const access = await api.createProjectDatabaseAccess({
+      projectId: command.projectId,
+      environment: command.environment,
+      mode: command.mode,
+      ttlSeconds: command.ttlSeconds,
+      label: command.label,
+    });
+    assertProjectDatabaseAccessCredential(access);
+    return success("database access create", { status: "succeeded", access });
+  }
+
+  private async listDatabaseAccess(
+    command: Extract<ProductCliCommand, { kind: "database-access-list" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const page = await api.listProjectDatabaseAccess({
+      projectId: command.projectId,
+      ...(command.environment === undefined ? {} : { environment: command.environment }),
+    });
+    assertProjectDatabaseAccessPage(page);
+    return success("database access list", { status: "succeeded", access: page.items });
+  }
+
+  private async revokeDatabaseAccess(
+    command: Extract<ProductCliCommand, { kind: "database-access-revoke" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const access = await api.revokeProjectDatabaseAccess({
+      projectId: command.projectId,
+      accessId: command.accessId,
+    });
+    assertProjectDatabaseAccess(access);
+    return success("database access revoke", { status: "succeeded", access });
+  }
+
+  /** The answer names the event type to subscribe to; the watch already carries the columns and the topic. */
+  private async createDatabaseWatch(
+    command: Extract<ProductCliCommand, { kind: "database-watch-create" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const watch = await api.createProjectDatabaseWatch({
+      projectId: command.projectId,
+      environment: command.environment,
+      idempotencyKey: command.idempotencyKey,
+      request: command.request,
+    });
+    return success("database watch create", {
+      status: "succeeded",
+      watch,
+      next_action: `Run '${this.dependencies.commandPrefix} database webhook create --project ${command.projectId} --environment ${command.environment} --url HTTPS_URL --event-types ${watch.event_type} --idempotency-key KEY --yes --json' to receive ${watch.event_type} events at an HTTPS receiver.`,
+    });
+  }
+
+  private async listDatabaseWatches(
+    command: Extract<ProductCliCommand, { kind: "database-watch-list" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const page = await api.listProjectDatabaseWatches({
+      projectId: command.projectId,
+      environment: command.environment,
+    });
+    return success("database watch list", { status: "succeeded", watch: page.items });
+  }
+
+  private async deleteDatabaseWatch(
+    command: Extract<ProductCliCommand, { kind: "database-watch-delete" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const deleted = await api.deleteProjectDatabaseWatch({
+      projectId: command.projectId,
+      environment: command.environment,
+      idempotencyKey: command.idempotencyKey,
+      watchId: command.watchId,
+    });
+    return success("database watch delete", { status: "succeeded", deleted });
+  }
+
+  /** The columns file and the key are checked before any request; a repeat answers the same table with created false. */
+  private async createDatabaseTable(
+    command: Extract<ProductCliCommand, { kind: "database-table-create" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const request = await tableCreateRequest(command);
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const answer = await api.createProjectDatabaseTable({
+      projectId: command.projectId,
+      environment: command.environment,
+      idempotencyKey: command.idempotencyKey,
+      request,
+    });
+    return success("database table create", { status: "succeeded", table: answer.table });
+  }
+
+  /** The signing secret is returned by create only; every other answer carries no secret. */
+  private async createDatabaseWebhook(
+    command: Extract<ProductCliCommand, { kind: "database-webhook-create" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const request = await webhookCreateRequest(command);
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const webhook = await api.createProjectDatabaseWebhook({
+      projectId: command.projectId,
+      environment: command.environment,
+      idempotencyKey: command.idempotencyKey,
+      url: request.url,
+      eventTypes: request.event_types,
+      headers: request.headers,
+    });
+    return success("database webhook create", { status: "succeeded", webhook });
+  }
+
+  private async databaseWebhookSubscription(
+    command: Extract<
+      ProductCliCommand,
+      {
+        kind:
+          | "database-webhook-subscription-activate"
+          | "database-webhook-subscription-deactivate"
+          | "database-webhook-subscription-status";
+      }
+    >,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const common = {
+      projectId: command.projectId,
+      environment: command.environment,
+      subscriptionId: command.subscriptionId,
+    };
+    if (command.kind === "database-webhook-subscription-activate") {
+      const request = await webhookCreateRequest(command);
+      const file = await preparePrivateSecretFile(command.outputPath);
+      try {
+        const api = await this.authenticatedApi(command.credentialStore, signal);
+        const value = await api.activateDatabaseWebhookSubscription({
+          ...common,
+          generation: command.generation,
+          idempotencyKey: command.idempotencyKey,
+          request,
+        });
+        await file.save(value.secret);
+        const subscription = {
+          id: value.id,
+          environment: value.environment,
+          state: value.state,
+          generation: value.generation,
+          provider_id: value.provider_id,
+        };
+        return success(parsedCommandName(command), {
+          status: "succeeded",
+          subscription,
+          secret_file: file.path,
+        });
+      } finally {
+        await file.close();
+      }
+    }
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const subscription =
+      command.kind === "database-webhook-subscription-status"
+        ? await api.getDatabaseWebhookSubscription(common)
+        : await api.deactivateDatabaseWebhookSubscription({
+            ...common,
+            generation: command.generation,
+            idempotencyKey: command.idempotencyKey,
+          });
+    return success(parsedCommandName(command), { status: "succeeded", subscription });
+  }
+
+  private async listDatabaseWebhooks(
+    command: Extract<ProductCliCommand, { kind: "database-webhook-list" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const page = await api.listProjectDatabaseWebhooks({
+      projectId: command.projectId,
+      environment: command.environment,
+    });
+    return success("database webhook list", { status: "succeeded", webhook: page.items });
+  }
+
+  private async getDatabaseWebhook(
+    command: Extract<ProductCliCommand, { kind: "database-webhook-get" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const webhook = await api.getProjectDatabaseWebhook({
+      projectId: command.projectId,
+      environment: command.environment,
+      webhookId: command.webhookId,
+    });
+    return success("database webhook get", { status: "succeeded", webhook });
+  }
+
+  private async deleteDatabaseWebhook(
+    command: Extract<ProductCliCommand, { kind: "database-webhook-delete" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const deleted = await api.deleteProjectDatabaseWebhook({
+      projectId: command.projectId,
+      environment: command.environment,
+      webhookId: command.webhookId,
+      ...(command.idempotencyKey === null ? {} : { idempotencyKey: command.idempotencyKey }),
+    });
+    return success("database webhook delete", { status: "succeeded", deleted });
+  }
+
+  private async testDatabaseWebhook(
+    command: Extract<ProductCliCommand, { kind: "database-webhook-test" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const result = await api.testProjectDatabaseWebhook({
+      projectId: command.projectId,
+      environment: command.environment,
+      webhookId: command.webhookId,
+      ...(command.idempotencyKey === null ? {} : { idempotencyKey: command.idempotencyKey }),
+    });
+    return success("database webhook test", { status: "succeeded", result });
+  }
+
+  private async listDatabaseWebhookDeliveries(
+    command: Extract<ProductCliCommand, { kind: "database-webhook-deliveries" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const page = await api.listProjectDatabaseWebhookDeliveries({
+      projectId: command.projectId,
+      environment: command.environment,
+      ...(command.webhookId === null ? {} : { webhookId: command.webhookId }),
+      ...(command.limit === null ? {} : { limit: command.limit }),
+      ...(command.cursor === null ? {} : { cursor: command.cursor }),
+    });
+    return success("database webhook deliveries", {
+      status: "succeeded",
+      delivery: page.items,
+      next_cursor: page.next_cursor,
+    });
+  }
+
+  private async replayDatabaseWebhookDelivery(
+    command: Extract<ProductCliCommand, { kind: "database-webhook-replay" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const replay = await api.replayProjectDatabaseWebhookDelivery({
+      projectId: command.projectId,
+      environment: command.environment,
+      deliveryId: command.deliveryId,
+      ...(command.idempotencyKey === null ? {} : { idempotencyKey: command.idempotencyKey }),
+    });
+    return success("database webhook replay", { status: "succeeded", replay });
+  }
+
+  /** The statements file and the schedule fields are checked before any request is sent. */
+  private async setDatabaseSchedule(
+    command: Extract<ProductCliCommand, { kind: "database-schedule-set" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const request = await scheduleSetRequest(command);
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const schedule = await api.setProjectDatabaseSchedule({
+      projectId: command.projectId,
+      environment: command.environment,
+      name: command.name,
+      request,
+    });
+    return success("database schedule set", { status: "succeeded", schedule });
+  }
+
+  private async listDatabaseSchedules(
+    command: Extract<ProductCliCommand, { kind: "database-schedule-list" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const page = await api.listProjectDatabaseSchedules({
+      projectId: command.projectId,
+      environment: command.environment,
+    });
+    return success("database schedule list", { status: "succeeded", schedule: page.items });
+  }
+
+  private async getDatabaseSchedule(
+    command: Extract<ProductCliCommand, { kind: "database-schedule-get" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const schedule = await api.getProjectDatabaseSchedule({
+      projectId: command.projectId,
+      environment: command.environment,
+      name: command.name,
+    });
+    return success("database schedule get", { status: "succeeded", schedule });
+  }
+
+  private async deleteDatabaseSchedule(
+    command: Extract<ProductCliCommand, { kind: "database-schedule-delete" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const deleted = await api.deleteProjectDatabaseSchedule({
+      projectId: command.projectId,
+      environment: command.environment,
+      name: command.name,
+    });
+    return success("database schedule delete", { status: "succeeded", deleted });
+  }
+
+  private async listDatabaseScheduleRuns(
+    command: Extract<ProductCliCommand, { kind: "database-schedule-runs" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const page = await api.listProjectDatabaseScheduleRuns({
+      projectId: command.projectId,
+      environment: command.environment,
+      name: command.name,
+      ...(command.limit === null ? {} : { limit: command.limit }),
+    });
+    return success("database schedule runs", { status: "succeeded", schedule_run: page.items });
+  }
+
+  private async runDatabaseSchedule(
+    command: Extract<ProductCliCommand, { kind: "database-schedule-run" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const run = await api.runProjectDatabaseSchedule({
+      projectId: command.projectId,
+      environment: command.environment,
+      name: command.name,
+      ...(command.idempotencyKey === null ? {} : { idempotencyKey: command.idempotencyKey }),
+    });
+    return success("database schedule run", { status: "succeeded", run });
+  }
+
+  private async getDatabaseExecutionUsage(
+    command: Extract<ProductCliCommand, { kind: "database-executions" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const page = await api.getProjectDatabaseExecutionUsage({
+      projectId: command.projectId,
+      environment: command.environment,
+      from: command.from,
+      to: command.to,
+      granularity: command.granularity,
+      ...(command.limit === null ? {} : { limit: command.limit }),
+      ...(command.cursor === null ? {} : { cursor: command.cursor }),
+    });
+    return success("database executions", {
+      status: "succeeded",
+      usage: page.items,
+      next_cursor: page.next_cursor,
+    });
+  }
+
+  /** psql receives the password through its own environment; the URI is never printed. */
+  private async runProjectPsql(
+    command: Extract<ProductCliCommand, { kind: "database-psql" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const spawnPsql = this.dependencies.spawnPsql;
+    if (spawnPsql === undefined) return psqlUnavailable();
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const credential = await api.createProjectDatabaseAccess({
+      projectId: command.projectId,
+      environment: command.environment,
+      mode: command.mode,
+      ttlSeconds: command.ttlSeconds,
+      label: "psql",
+    });
+    assertProjectDatabaseAccessCredential(credential);
+    const { connection_uri, psql_command, ...access } = credential;
+    void connection_uri;
+    void psql_command;
+    // The revoke runs on its own bounded requests: Ctrl-C or SIGTERM must not cancel the cleanup.
+    const cleanupSignal = new AbortController().signal;
+    const cleanup = this.dependencies.productApi(
+      () => this.authenticatedToken(command.credentialStore, cleanupSignal),
+      cleanupSignal,
+    );
+    const revokeAction = `The temporary credential could not be revoked. Run '${this.dependencies.commandPrefix} database access revoke --project ${command.projectId} --access ${credential.access_id} --yes --json' now; it expires on its own at ${credential.expires_at}.`;
+    let exitCode: number;
+    try {
+      exitCode = await spawnPsql({
+        host: credential.host,
+        user: credential.role_name,
+        password: decodeURIComponent(new URL(credential.connection_uri).password),
+        websocketUrl: credential.websocket_url,
+        database: credential.database,
+        mode: credential.mode,
+        signal,
+      });
+    } catch (error) {
+      const revoked = await this.revokeIssuedAccess(
+        cleanup,
+        command.projectId,
+        credential.access_id,
+      );
+      if (error instanceof PsqlUnavailableError) return psqlUnavailable();
+      if (!revoked && (signal.aborted || isCancellation(error)))
+        return failure("database psql", 130, "command_cancelled", true, revokeAction);
+      throw error;
+    }
+    const revoked = await this.revokeIssuedAccess(cleanup, command.projectId, credential.access_id);
+    const notRevoked = revoked ? {} : { next_action: revokeAction };
+    if (exitCode === 0)
+      return success("database psql", { status: "succeeded", access, exit_code: 0, ...notRevoked });
+    return {
+      exitCode,
+      stdout: `${JSON.stringify({
+        version: 1,
+        command: "database psql",
+        status: "error",
+        error: {
+          code: "psql_failed",
+          retryable: false,
+          suggested_action: revoked
+            ? "Read the psql output above. The temporary credential was revoked; request a new one with 'ohmyhost database access create'."
+            : revokeAction,
+        },
+      })}\n`,
+      stderr: "",
+    };
+  }
+
+  private async revokeIssuedAccess(
+    api: ProductApi,
+    projectId: string,
+    accessId: string,
+  ): Promise<boolean> {
+    try {
+      await api.revokeProjectDatabaseAccess({ projectId, accessId });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private async planPaidDomain(
+    command: Extract<ProductCliCommand, { kind: "paid-domain-plan" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const plan = parsePaidDomainPlan(
+      await api.planPaidDomain({ projectId: command.projectId, hostname: command.hostname }),
+    );
+    return success("domain paid plan", { status: "planned", plan });
+  }
+
+  private async applyPaidDomain(
+    command: Extract<ProductCliCommand, { kind: "paid-domain-apply" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const domain = parsePaidDomain(
+      await api.applyPaidDomain({
+        projectId: command.projectId,
+        hostname: command.hostname,
+        idempotencyKey: command.idempotencyKey,
+      }),
+    );
+    return success("domain paid apply", { status: domain.status, domain });
+  }
+
+  private async getPaidDomain(
+    command: Extract<ProductCliCommand, { kind: "paid-domain-status" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const domain = parsePaidDomain(await api.getPaidDomain(command.projectId));
+    return success("domain paid status", { status: domain.status, domain });
+  }
+
+  private async deletePaidDomain(
+    command: Extract<ProductCliCommand, { kind: "paid-domain-delete" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const domain = parsePaidDomain(
+      await api.deletePaidDomain({
+        projectId: command.projectId,
+        hostname: command.hostname,
+        idempotencyKey: command.idempotencyKey,
+      }),
+    );
+    return success("domain paid delete", { status: domain.status, domain });
+  }
+
+  private async linkSource(
+    command: Extract<ProductCliCommand, { kind: "link" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const accepted = parseOperation(await api.linkSource(command));
+    const operation = await this.waitForOperation(api, accepted, signal);
+    const project = await api.getProjectStatus(command.projectId);
+    parseProjectStatus(project);
+    const source = project.source;
+    if (
+      project.project_id !== command.projectId ||
+      source === null ||
+      source.provider !== "github" ||
+      source.status !== "ready" ||
+      source.repository_full_name.toLowerCase() !==
+        `${command.repositoryOwner}/${command.repositoryName}`.toLowerCase()
+    )
+      throw new ResponseContractError();
+    // The link names the organization the server authorized, so this checkout can be linked once
+    // per organization and another account's link is never used by mistake.
+    const [organizationId, ...others] = parseCurrentIdentity(
+      await api.getCurrentIdentity(),
+    ).organization_ids;
+    if (organizationId === undefined || others.length > 0) throw new ResponseContractError();
+    await this.dependencies.projectLinkStore.save({
+      version: 2,
+      api_origin: this.dependencies.productApiOrigin,
+      organization_id: organizationId,
+      project_id: command.projectId,
+      installation_id: source.installation_id,
+      repository_full_name: source.repository_full_name,
+    });
+    return success("link", { status: "completed", operation, organization_id: organizationId });
+  }
+
+  private async managedSource(
+    command: Extract<
+      ProductCliCommand,
+      {
+        kind:
+          | "source-read"
+          | "source-publish"
+          | "source-initialize"
+          | "source-restore"
+          | "source-complete";
+      }
+    >,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const source = api.managedSource;
+    if (source === undefined) throw new ProviderCapabilityBlockedError();
+    const name = parsedCommandName(command);
+    if (command.kind === "source-complete") {
+      const completed = await completeLocalSourcePublication({
+        api: source,
+        getOperation: (id) => api.getOperation(id),
+        directory: resolve(this.dependencies.sourceDirectory ?? process.cwd(), command.directory),
+        metadataDirectory: this.dependencies.sourceMetadataDirectory,
+        apiOrigin: this.dependencies.productApiOrigin,
+        identity: await api.getCurrentIdentity(),
+        projectId: command.projectId,
+        operationId: command.operationId,
+      });
+      return success(name, completed);
+    }
+    if (command.kind === "source-read") {
+      const result =
+        command.action === "status"
+          ? await source.getSource(command.projectId)
+          : command.action === "files" || command.action === "file"
+            ? await source.files({
+                projectId: command.projectId,
+                commitSha: command.commitSha,
+                path: command.path,
+              })
+            : command.action === "versions"
+              ? await source.versions({
+                  projectId: command.projectId,
+                  limit: command.limit,
+                  beforeCommitSha: command.beforeCommitSha,
+                })
+              : command.action === "diff"
+                ? await source.diff({
+                    projectId: command.projectId,
+                    fromCommitSha: String(command.fromCommitSha),
+                    toCommitSha: String(command.toCommitSha),
+                  })
+                : await source.getUpload({
+                    projectId: command.projectId,
+                    operationId: String(command.operationId),
+                  });
+      if (command.action === "status") {
+        if (result !== null) parseProjectSourceBinding(result);
+      } else
+        assertManagedSourceResponse(command.action === "file" ? "files" : command.action, result);
+      return success(name, { status: "succeeded", source: result, context: this.context() });
+    }
+    let operation: ReturnType<typeof parseOperation>;
+    let receipt: unknown;
+    let snapshot: { sha256: string; total_bytes: number; files: number } | undefined;
+    if (command.kind === "source-publish") {
+      const directory = resolve(
+        this.dependencies.sourceDirectory ?? process.cwd(),
+        command.directory,
+      );
+      const captured = await createSourceSnapshot({
+        directory,
+      });
+      const prepared = await prepareLocalSourcePublication({
+        directory,
+        metadataDirectory: this.dependencies.sourceMetadataDirectory,
+        apiOrigin: this.dependencies.productApiOrigin,
+        identity: await api.getCurrentIdentity(),
+        projectId: command.projectId,
+        request: command.request,
+        explicitExpectedCommit: command.explicitExpectedCommit,
+        snapshotSha256: captured.sha256,
+        idempotencyKey: command.idempotencyKey,
+      });
+      const published = await publishSourceSnapshot({
+        api: source,
+        projectId: command.projectId,
+        request: prepared.request,
+        snapshot: captured,
+        idempotencyKey: command.idempotencyKey,
+        signal,
+        accepted: prepared.accepted,
+        rejected: prepared.rejected,
+      });
+      operation = parseOperation(published.operation);
+      receipt = published.receipt;
+      snapshot = {
+        sha256: captured.sha256,
+        total_bytes: captured.totalBytes,
+        files: captured.files.length,
+      };
+    } else
+      operation = parseOperation(
+        command.kind === "source-initialize"
+          ? await source.initialize({
+              projectId: command.projectId,
+              body: command.request,
+              idempotencyKey: command.idempotencyKey,
+            })
+          : await source.restore({
+              projectId: command.projectId,
+              body: command.request,
+              idempotencyKey: command.idempotencyKey,
+            }),
+      );
+    if (command.wait) operation = await this.waitForOperation(api, operation, signal);
+    if (operation.state === "succeeded" && command.kind === "source-publish") {
+      const completed = await completeLocalSourcePublication({
+        api: source,
+        getOperation: (id) => api.getOperation(id),
+        directory: resolve(this.dependencies.sourceDirectory ?? process.cwd(), command.directory),
+        metadataDirectory: this.dependencies.sourceMetadataDirectory,
+        apiOrigin: this.dependencies.productApiOrigin,
+        identity: await api.getCurrentIdentity(),
+        projectId: command.projectId,
+        operationId: operation.id,
+      });
+      receipt = completed.receipt;
+    } else if (operation.state === "succeeded") {
+      const current = await source.getSource(command.projectId);
+      parseProjectSourceBinding(current);
+      if (
+        current === null ||
+        typeof current !== "object" ||
+        !("provider" in current) ||
+        current.provider !== "managed"
+      )
+        throw new ResponseContractError();
+      const managed = current as ManagedProjectSource;
+      const expectedGeneration =
+        command.kind === "source-initialize" ||
+        (command.kind === "source-publish" && command.request.mode !== "commit")
+          ? command.request.expected_source_generation + 1
+          : command.request.expected_source_generation;
+      if (managed.source_generation !== expectedGeneration || managed.status !== "ready")
+        throw new ResponseContractError();
+      const [organizationId, ...others] = parseCurrentIdentity(
+        await api.getCurrentIdentity(),
+      ).organization_ids;
+      if (organizationId === undefined || others.length > 0) throw new ResponseContractError();
+      const prior = (
+        await readProjectLinks(
+          join(
+            this.dependencies.sourceDirectory ?? process.cwd(),
+            this.dependencies.sourceMetadataDirectory ?? ".ohmyhost",
+          ),
+          this.dependencies.productApiOrigin,
+        )
+      ).links.find(
+        (link) => link.organization_id === organizationId && link.project_id === command.projectId,
+      );
+      const confirmed =
+        prior?.version === 3 &&
+        prior.source.provider === "managed" &&
+        prior.source.source_connection_id === managed.source_connection_id &&
+        prior.source.source_generation === managed.source_generation
+          ? prior.source.last_confirmed_commit_sha
+          : null;
+      await this.dependencies.projectLinkStore.save({
+        version: 3,
+        api_origin: this.dependencies.productApiOrigin,
+        organization_id: organizationId,
+        project_id: command.projectId,
+        source: {
+          provider: "managed",
+          source_connection_id: managed.source_connection_id,
+          source_generation: managed.source_generation,
+          namespace: managed.namespace,
+          repository_name: managed.repository_name,
+          branch: "main",
+          last_confirmed_commit_sha: confirmed,
+        },
+      });
+    }
+    return success(name, {
+      status: command.wait ? "completed" : "accepted",
+      operation,
+      ...(receipt === undefined ? {} : { receipt }),
+      ...(snapshot === undefined ? {} : { snapshot }),
+      next_action:
+        "Read the resulting commit_sha, then plan and deploy that exact version. Publication is a separate action.",
+    });
+  }
+
+  private async configureAutoDeploy(
+    command: Extract<ProductCliCommand, { kind: "source-auto-deploy-set" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const autoDeploy = await api.configureAutoDeploy(command);
+    return success("source auto-deploy set", { status: "configured", auto_deploy: autoDeploy });
+  }
+
+  private async getAutoDeploy(
+    command: Extract<ProductCliCommand, { kind: "source-auto-deploy-status" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const autoDeploy = await api.getAutoDeploy(command.projectId);
+    return success("source auto-deploy status", {
+      status: autoDeploy.generation === 0 ? "not_configured" : "ready",
+      auto_deploy: autoDeploy,
+    });
+  }
+
+  private async authorizeCloudflareDns(
+    command: Extract<ProductCliCommand, { kind: "domain-cloudflare-authorize" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const authorization = parseCloudflareDnsAuthorization(
+      await api.authorizeCloudflareDns({
+        projectId: command.projectId,
+        zone: command.zone,
+        idempotencyKey: command.idempotencyKey,
+      }),
+    );
+    return success("domain cloudflare authorize", {
+      status: "authorization_required",
+      authorization,
+    });
+  }
+
+  private async getCloudflareDnsStatus(
+    command: Extract<ProductCliCommand, { kind: "domain-cloudflare-status" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const cloudflareDns = parseCloudflareDnsAuthorizationStatus(
+      await api.getCloudflareDnsStatus(command.projectId),
+    );
+    return success("domain cloudflare status", {
+      status: cloudflareDns.status,
+      cloudflare_dns: cloudflareDns,
+    });
+  }
+
+  private async applyProjectDomains(
+    command: Extract<ProductCliCommand, { kind: "domain-cloudflare-apply" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const accepted = parseOperation(
+      await api.applyProjectDomains({
+        projectId: command.projectId,
+        idempotencyKey: command.idempotencyKey,
+      }),
+    );
+    const operation = await this.waitForOperation(api, accepted, signal);
+    return success("domain cloudflare apply", { status: "completed", operation });
+  }
+
+  private async planDeployment(
+    command: Extract<ProductCliCommand, { kind: "plan" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const plan = parseDeploymentPlan(await api.planDeployment(command));
+    // Say which environment this plan changes and how the change reaches the live site.
+    const notes =
+      plan["environment"] === "prod"
+        ? [
+            `This plan builds straight into Prod (${String(plan["route"])}); Prod traffic switches once it is activated.`,
+          ]
+        : [
+            `This plan updates Dev only (${String(plan["route"])}). To go live, deploy with --environment prod or promote the Dev deployment with '${this.dependencies.commandPrefix} deployment promote plan --project ULID --deployment DEV_DEPLOYMENT_ULID --json'.`,
+          ];
+    return success("plan", { status: "planned", plan, notes });
+  }
+
+  private async deploy(
+    command: Extract<ProductCliCommand, { kind: "deploy" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    // With --commit the deploy plans first, so an approved deploy needs no separate plan step.
+    const plan =
+      command.commitSha === null
+        ? null
+        : parseDeploymentPlan(
+            await api.planDeployment({
+              projectId: command.projectId,
+              commitSha: command.commitSha,
+              ...(command.environment === undefined ? {} : { environment: command.environment }),
+            }),
+          );
+    let accepted: unknown;
+    try {
+      accepted = await api.createDeployment({
+        projectId: command.projectId,
+        planId: plan === null ? String(command.planId) : String(plan["id"]),
+        idempotencyKey: command.idempotencyKey,
+      });
+    } catch (error) {
+      // A rerun of --commit re-plans, so its key meets a new plan ID; a new key would build the
+      // same commit a second time. The deployment the key started is followed instead.
+      const reused = plan === null ? undefined : reusedKeyProblem(error);
+      if (reused === undefined) throw error;
+      return failure(
+        "deploy",
+        7,
+        reused.code,
+        false,
+        `This key already started a deployment from an earlier run of this command; a new key would build the same commit again. Run 'ohmyhost project status --project ${command.projectId} --json' and follow latest_operation with 'ohmyhost operation get OPERATION_ULID --json'.`,
+        undefined,
+        undefined,
+        reused.requestId,
+        reused.docsUrl,
+        undefined,
+        reused.message,
+      );
+    }
+    let operation = parseOperation(accepted);
+    if (command.wait) operation = await this.waitForOperation(api, operation, signal);
+    // Dev access follows the project-selected mode; the clean URL alone is insufficient when protected.
+    const notes =
+      operation.state === "succeeded"
+        ? [
+            `If this is a Dev deployment, check project status for dev_access_mode. For protected Dev, run '${this.dependencies.commandPrefix} project dev-share link --project ULID --json' and open or share its persistent share_url; public Dev opens directly.`,
+          ]
+        : [];
+    return success("deploy", {
+      status: command.wait ? "completed" : "accepted",
+      operation,
+      ...(plan === null ? {} : { plan }),
+      // The note is conditional ("if this is a Dev deployment"), so a --plan-id deploy, whose environment the CLI
+      // cannot read, gets it too. A plan known to target Prod gets none.
+      ...(notes.length > 0 && (plan === null || plan["environment"] === "dev") ? { notes } : {}),
+    });
+  }
+
+  private async logs(
+    command: Extract<ProductCliCommand, { kind: "logs" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    // The operation read answers an unknown, foreign or mistyped ID before any stream opens.
+    let operation = parseOperation(await api.getOperation(command.operationId));
+    let eventCount = 0;
+    let lastEventId: string | undefined;
+    for (let connection = 0; connection < OPERATION_STREAM_CONNECTIONS; connection += 1) {
+      if (connection > 0)
+        await this.dependencies.waitUntil(
+          new Date(this.dependencies.now().getTime() + 1_000),
+          signal,
+        );
+      const events =
+        lastEventId === undefined
+          ? await api.streamOperationEvents(command.operationId, signal)
+          : await api.streamOperationEvents(command.operationId, signal, lastEventId);
+      for await (const event of events) {
+        const parsed = parseOperationEvent(event);
+        this.dependencies.operationEventSink?.write(`${JSON.stringify(parsed)}\n`);
+        eventCount += 1;
+        lastEventId = String(parsed["event_id"]);
+        if (
+          parsed["type"] === "OperationSucceeded" ||
+          parsed["type"] === "OperationFailed" ||
+          parsed["type"] === "OperationCancelled"
+        )
+          return success("logs", { status: "completed", event_count: eventCount });
+      }
+      throwIfAborted(signal);
+      // The server also closes a stream without a final event, for example when an interactive
+      // sign-in expires. Only the operation itself says whether it ended meanwhile.
+      operation = parseOperation(await api.getOperation(command.operationId));
+      if (operation.state !== "queued" && operation.state !== "running")
+        return success("logs", { status: "completed", event_count: eventCount, operation });
+    }
+    throw new ProductCliFailure(
+      8,
+      "operation_stream_ended",
+      true,
+      `The event stream ended before operation ${command.operationId} finished, and it is still running; nothing was cancelled. Poll 'ohmyhost operation get ${command.operationId} --json' about every 60 seconds until it is succeeded, failed or cancelled.`,
+      operation,
+    );
+  }
+  private async listDeployments(
+    command: Extract<ProductCliCommand, { kind: "deployment-list" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const page = parseDeploymentPage(
+      await api.listDeployments({
+        projectId: command.projectId,
+        ...(command.cursor === undefined ? {} : { cursor: command.cursor }),
+        ...(command.limit === undefined ? {} : { limit: command.limit }),
+      }),
+    );
+    return success("deployment list", { items: page.items, next_cursor: page.next_cursor });
+  }
+
+  private async getDeployment(
+    command: Extract<ProductCliCommand, { kind: "deployment-get" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const deployment = parseDeploymentRecord(
+      await api.getDeployment({ projectId: command.projectId, deploymentId: command.deploymentId }),
+    );
+    return success("deployment get", { deployment });
+  }
+
+  private async deploymentLogs(
+    command: Extract<ProductCliCommand, { kind: "deployment-logs" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    // The diagnostics are one bounded page; a plain read answers a missing deployment at once,
+    // where its event stream retried a 404 without end.
+    const page = await api.getDeploymentLogs({
+      projectId: command.projectId,
+      deploymentId: command.deploymentId,
+      limit: 100,
+      ...(command.cursor === undefined ? {} : { cursor: command.cursor }),
+    });
+    for (const item of page.items)
+      this.dependencies.operationEventSink?.write(`${JSON.stringify(item)}\n`);
+    return success("deployment logs", {
+      status: "completed",
+      event_count: page.items.length,
+      ...(page.next_cursor === undefined ? {} : { next_cursor: page.next_cursor }),
+    });
+  }
+
+  private async planRollback(
+    command: Extract<ProductCliCommand, { kind: "rollback-plan" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    return success("rollback plan", {
+      status: "planned",
+      plan: parseGuardedActionPlan(await api.planRollback(command)),
+    });
+  }
+
+  private async rollback(
+    command: Extract<ProductCliCommand, { kind: "rollback" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const operation = parseOperation(await api.rollback(command));
+    return success("rollback", { status: "accepted", operation });
+  }
+
+  private async planPromotion(
+    command: Extract<ProductCliCommand, { kind: "promotion-plan" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    return success("deployment promote plan", {
+      status: "planned",
+      plan: parseGuardedActionPlan(await api.planPromotion(command)),
+    });
+  }
+
+  private async promote(
+    command: Extract<ProductCliCommand, { kind: "promote" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    let operation = parseOperation(await api.promote(command));
+    if (command.wait) operation = await this.waitForOperation(api, operation, signal);
+    return success("deployment promote", {
+      status: command.wait ? "completed" : "accepted",
+      operation,
+    });
+  }
+
+  private async planDelete(
+    command: Extract<ProductCliCommand, { kind: "delete-plan" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    return success("delete plan", {
+      status: "planned",
+      plan: parseGuardedActionPlan(await api.planDelete(command.projectId)),
+    });
+  }
+
+  private async deleteProject(
+    command: Extract<ProductCliCommand, { kind: "delete" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const operation = parseOperation(await api.deleteProject(command));
+    return success("delete", { status: "accepted", operation });
+  }
+
+  private async listEnvironmentSecrets(
+    command: Extract<ProductCliCommand, { kind: "secret-list" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const page = parseEnvironmentSecretPage(
+      await api.listEnvironmentSecrets({
+        projectId: command.projectId,
+        environmentId: command.environmentId,
+      }),
+    );
+    return success("secret list", { status: "listed", secrets: page.items });
+  }
+
+  private async listFunctionRuns(
+    command: Extract<ProductCliCommand, { kind: "function-runs" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const page = parseFunctionRunPage(
+      await api.listFunctionRuns({
+        projectId: command.projectId,
+        environmentId: command.environmentId,
+        limit: command.limit,
+      }),
+    );
+    return success("function runs", { status: "listed", runs: page.items });
+  }
+
+  private async putEnvironmentSecret(
+    command: Extract<ProductCliCommand, { kind: "secret-set" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const value = await this.dependencies.readSecretValue(signal);
+    const valueBytes = new TextEncoder().encode(value);
+    if (valueBytes.byteLength === 0 || valueBytes.byteLength > 5_120) {
+      valueBytes.fill(0);
+      throw new SecretInputError();
+    }
+    try {
+      const secret = parseEnvironmentSecret(
+        await api.putEnvironmentSecret({
+          projectId: command.projectId,
+          environmentId: command.environmentId,
+          name: command.name,
+          value,
+          idempotencyKey: command.idempotencyKey,
+        }),
+      );
+      const completed = command.wait
+        ? await this.waitForSecretDelivery(
+            api,
+            command.projectId,
+            command.environmentId,
+            secret,
+            signal,
+          )
+        : secret;
+      return success("secret set", {
+        status: command.wait && completed.delivery_state === "ready" ? "ready" : "stored",
+        secret: completed,
+      });
+    } finally {
+      valueBytes.fill(0);
+    }
+  }
+
+  private async deleteEnvironmentSecret(
+    command: Extract<ProductCliCommand, { kind: "secret-delete" }>,
+    signal: AbortSignal,
+  ): Promise<CliResult> {
+    const api = await this.authenticatedApi(command.credentialStore, signal);
+    const deleted = parseEnvironmentSecretDeletion(
+      await api.deleteEnvironmentSecret({
+        projectId: command.projectId,
+        environmentId: command.environmentId,
+        name: command.name,
+        idempotencyKey: command.idempotencyKey,
+      }),
+    );
+    const delivery = command.wait
+      ? await this.waitForSecretDelivery(
+          api,
+          command.projectId,
+          command.environmentId,
+          { desired_generation: deleted.desired_generation },
+          signal,
+        )
+      : deleted;
+    return success("secret delete", {
+      status: command.wait && delivery.delivery_state === "ready" ? "ready" : deleted.status,
+      secret: { name: deleted.name, ...secretDeliveryProjection(delivery) },
+    });
+  }
+
+  private async waitForSecretDelivery(
+    api: ProductApi,
+    projectId: string,
+    environmentId: string,
+    stored: Readonly<{ desired_generation: number }> | PublicEnvironmentSecret,
+    signal: AbortSignal,
+  ) {
+    const desiredGeneration = stored.desired_generation;
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      const page = parseEnvironmentSecretPage(
+        await api.listEnvironmentSecrets({ projectId, environmentId }),
+      );
+      if (page.last_error !== null || page.delivery_state === "failed") {
+        throw new ProductCliFailure(
+          10,
+          "secret_delivery_failed",
+          true,
+          `The secret is saved, but delivering it to the running app failed (last_error in 'ohmyhost secret list --project ${projectId} --environment ${environmentId} --json'). Do not set the value again: ohmyho.st retries delivery automatically, and the next deployment of this environment also delivers it. Read secret list again in a few minutes; if delivery_state stays failed, report last_error with feedback submit (kind bug, error code secret_delivery_failed).`,
+        );
+      }
+      // Before an environment's first deployment nothing runs to deliver to: the value arrives
+      // with that deployment, so waiting could only time out.
+      if (
+        page.delivery_state === "not_deployed" ||
+        (page.delivery_state === "ready" &&
+          page.desired_generation >= desiredGeneration &&
+          page.applied_generation >= desiredGeneration)
+      ) {
+        // Every item carries the environment's generations; only the item with the stored
+        // secret's name describes the secret that was just set. A deletion has no item left
+        // and reads the environment delivery state instead.
+        if (!("name" in stored)) return page;
+        return (
+          page.items.find((secret) => secret.name === stored.name) ?? {
+            ...stored,
+            desired_generation: page.desired_generation,
+            applied_generation: page.applied_generation,
+            delivery_state: page.delivery_state,
+          }
+        );
+      }
+      await this.dependencies.waitUntil(
+        new Date(this.dependencies.now().getTime() + 1_000),
+        signal,
+      );
+    }
+    throw new ProductCliFailure(
+      8,
+      "secret_delivery_wait_timeout",
+      true,
+      `The secret is saved, but it had not reached the running app after about 2 minutes. Read 'ohmyhost secret list --project ${projectId} --environment ${environmentId} --json': pending means delivery is still under way, and not_deployed means it arrives with the first deployment. Do not set the value again.`,
+    );
+  }
+
+  private async waitForOperation(
+    api: ProductApi,
+    initial: ReturnType<typeof parseOperation>,
+    signal: AbortSignal,
+  ): Promise<ReturnType<typeof parseOperation>> {
+    let operation = initial;
+    for (
+      let attempt = 0;
+      attempt < 120 &&
+      (operation.state === "queued" || operation.state === "running") &&
+      operation.reconciliation?.state !== "required";
+      attempt += 1
+    ) {
+      await this.dependencies.waitUntil(
+        new Date(this.dependencies.now().getTime() + 1_000),
+        signal,
+      );
+      operation = parseOperation(await api.getOperation(operation.id));
+    }
+    if (operation.reconciliation?.state === "required")
+      throw new ProductCliFailure(
+        10,
+        "operation_reconciliation_required",
+        false,
+        `${operation.reconciliation.suggested_action} Inspect 'ohmyhost operation get ${operation.id} --json' and use 'ohmyhost operation reconcile' after confirmation.`,
+        operation,
+      );
+    if (operation.state === "queued" || operation.state === "running")
+      throw new ProductCliFailure(
+        8,
+        "operation_wait_timeout",
+        true,
+        `The operation is still running; this command stopped waiting after about 2 minutes and cancelled nothing. Poll 'ohmyhost operation get ${operation.id} --json' about every 60 seconds until it is succeeded, failed or cancelled. Do not submit the same change again; a new key starts a second operation.`,
+        operation,
+      );
+    if (operation.state === "failed" && operation.error !== undefined)
+      throw new ProductCliFailure(
+        10,
+        operation.error.code,
+        operation.error.retryable,
+        operation.error.suggested_action,
+        operation,
+      );
+    if (operation.state === "cancelled")
+      throw new ProductCliFailure(
+        10,
+        "operation_not_succeeded",
+        false,
+        `The operation was cancelled. Inspect 'ohmyhost operation get ${operation.id} --json' before creating a new plan.`,
+        operation,
+      );
+    return operation;
+  }
+
+  private async authenticatedApi(
+    credentialStore: "native",
+    signal: AbortSignal,
+  ): Promise<ProductApi> {
+    await this.authenticatedToken(credentialStore, signal);
+    return this.dependencies.productApi(() => this.authenticatedToken(credentialStore, signal));
+  }
+
+  private async authenticatedToken(
+    credentialStore: "native",
+    signal: AbortSignal,
+  ): Promise<string> {
+    if (this.dependencies.apiToken !== undefined) return this.dependencies.apiToken;
+    const store = this.store(credentialStore);
+    const stored = await store.read();
+    if (stored === undefined) {
+      throw new ProductCliFailure(5, "authentication_required", false, this.loginAction());
+    }
+    let refresh: { readonly credential: CurrentCredential; readonly refreshed: boolean };
+    try {
+      refresh = await this.refreshIfExpired(stored, signal);
+    } catch (error) {
+      if (!(error instanceof TokenRefreshRejectedError)) throw error;
+      // The provider ended this login; only this saved login is removed.
+      const ended = this.#profile;
+      await this.forgetLogin(store);
+      throw new ProductCliFailure(
+        5,
+        "authentication_required",
+        false,
+        endedLoginAction(this.dependencies.commandPrefix, ended),
+      );
+    }
+    if (refresh.refreshed) await store.replace(refresh.credential);
+    return refresh.credential.accessToken;
+  }
+
+  private async refreshIfExpired(
+    credential: StoredCredential,
+    signal: AbortSignal,
+  ): Promise<{ readonly credential: CurrentCredential; readonly refreshed: boolean }> {
+    const expiresAt = credential.expiresAt === undefined ? NaN : Date.parse(credential.expiresAt);
+    if (
+      Number.isFinite(expiresAt) &&
+      expiresAt > this.dependencies.now().getTime() + this.dependencies.lifecycleTimeoutMs
+    ) {
+      return {
+        credential: {
+          accessToken: credential.accessToken,
+          refreshToken: credential.refreshToken,
+          expiresAt: credential.expiresAt as string,
+          ...workspaceOf(credential),
+        },
+        refreshed: false,
+      };
+    }
+    try {
+      const refreshed = await runBounded(
+        (bounded) =>
+          this.dependencies.tokenRefresher.refresh(
+            credential.refreshToken,
+            bounded,
+            credential.workosOrganizationId,
+          ),
+        signal,
+        this.dependencies.lifecycleTimeoutMs,
+      );
+      const refreshedExpiry = Date.parse(refreshed.expiresAt);
+      if (
+        !Number.isFinite(refreshedExpiry) ||
+        refreshedExpiry <= this.dependencies.now().getTime()
+      ) {
+        throw new Error("invalid refreshed expiry");
+      }
+      // WorkOS returns a bare credential; the selection only survives if we carry it forward.
+      // WorkOS returns a bare credential; the selection only survives if we carry it forward.
+      return { credential: { ...refreshed, ...workspaceOf(credential) }, refreshed: true };
+    } catch (error) {
+      if (isCancellation(error) && signal.aborted) throw error;
+      if (error instanceof ProviderCapabilityBlockedError) {
+        throw new ProductCliFailure(
+          9,
+          "blocked_prerequisite",
+          false,
+          "Token refresh is not available in this release; run 'ohmyhost login'.",
+        );
+      }
+      if (isTimeout(error)) {
+        // classifyFailure replaces this text with the advice for the command that timed out.
+        throw new ProductCliFailure(8, "request_timeout", true, requestTimeoutAction("unknown"));
+      }
+      if (error instanceof LifecycleTransportError) {
+        throw new ProductCliFailure(
+          5,
+          "token_refresh_failed",
+          true,
+          refreshFailedAction(this.dependencies.commandPrefix, this.#profile),
+        );
+      }
+      throw error;
+    }
+  }
+}
+
+function secretDeliveryProjection(value: {
+  readonly desired_generation: number;
+  readonly applied_generation: number;
+  readonly delivery_state: "not_deployed" | "pending" | "ready" | "failed";
+  readonly runtime_provider: "wfp" | null;
+  readonly applied_secret_count: number;
+  readonly last_error: string | null;
+}) {
+  return Object.freeze({
+    desired_generation: value.desired_generation,
+    applied_generation: value.applied_generation,
+    delivery_state: value.delivery_state,
+    runtime_provider: value.runtime_provider,
+    applied_secret_count: value.applied_secret_count,
+    last_error: value.last_error,
+  });
+}
+
+const SIGN_IN_WINDOW_MS = 30 * 60 * 1_000;
+
+const presentAuthorization = async (
+  presenter: DeviceAuthorizationPresenter,
+  authorization: DeviceAuthorization,
+): Promise<void> =>
+  presenter.present({
+    verificationUri: redactVerificationUri(authorization.verificationUri),
+    // One click instead of typing the code; absent when the provider omits it.
+    ...(authorization.verificationUriComplete === undefined
+      ? {}
+      : { verificationUriComplete: authorization.verificationUriComplete }),
+    userCode: authorization.userCode,
+    expiresInSeconds: authorization.expiresInSeconds,
+  });
+
+const redactVerificationUri = (value: string): string => {
+  const url = new URL(value);
+  url.search = "";
+  url.hash = "";
+  return url.toString();
+};
+
+/**
+ * Answers that mean "this account cannot see or use that": they name the account that ran, so a
+ * wrong saved login is told apart from a missing organization or GitHub authorization.
+ */
+export const ACCOUNT_SENSITIVE_PROBLEMS: ReadonlySet<string> = new Set([
+  "resource_not_found",
+  "forbidden",
+  "organization_required",
+  "github_connection_required",
+  "github_connection_revoked",
+  "repository_not_installed",
+]);
+
+/** The stable CLI answer for a failure outside a command run, such as choosing the account. */
+export const classifyCliFailure = (
+  command: RecognizedCommandLabel,
+  error: unknown,
+  signal: AbortSignal,
+): CliResult => classifyFailure(command, error, signal);
+
+const classifyFailure = (
+  command: CommandLabel,
+  error: unknown,
+  signal: AbortSignal,
+  actingAs?: Readonly<Record<string, unknown>>,
+  keyed = true,
+): CliResult => {
+  if (error instanceof LocalSourcePublicationError)
+    return failure(
+      command,
+      2,
+      error.code,
+      error.code === "source_publication_pending",
+      error.message,
+      error.operation,
+    );
+  if (error instanceof SourceWorkspaceError)
+    return failure(command, 2, error.code, error.code === "source_snapshot_changed", error.message);
+  if (signal.aborted || isCancellation(error)) {
+    return failure(
+      command,
+      130,
+      "command_cancelled",
+      true,
+      `The command was stopped by an interrupt or termination signal, for example the shell's command timeout, before it finished; ${retryAdvice(command, keyed)}. Give login and commands with --wait or --follow several minutes, or run them in the background.`,
+    );
+  }
+  if (isTimeout(error)) {
+    return failure(command, 8, "request_timeout", true, requestTimeoutAction(command, keyed));
+  }
+  // A retryable request_timeout is a token refresh that timed out inside this command; the logout
+  // timeout is not retryable and keeps its own advice.
+  if (error instanceof ProductCliFailure && error.code === "request_timeout" && error.retryable) {
+    return failure(command, 8, "request_timeout", true, requestTimeoutAction(command, keyed));
+  }
+  if (error instanceof ProductCliFailure) {
+    return failure(
+      command,
+      error.exitCode,
+      error.code,
+      error.retryable,
+      error.suggestedAction,
+      error.operation,
+    );
+  }
+  if (error instanceof SecretInputError) {
+    return failure(
+      command,
+      2,
+      "secret_input_invalid",
+      false,
+      command === "export create"
+        ? `Pipe the ZIP password through standard input: at least ${EXPORT_PASSWORD_MIN_CHARACTERS} characters, non-blank UTF-8 of at most 1024 bytes. A final line break becomes part of the password.`
+        : "Pipe a non-empty UTF-8 value of at most 5120 bytes through standard input.",
+    );
+  }
+  if (error instanceof WorkosContractError) {
+    if (error.code === "access_denied") {
+      return failure(
+        command,
+        4,
+        "device_authorization_denied",
+        false,
+        "The customer declined the sign-in in the browser; nothing was saved. Ask the customer whether to sign in, then run the same login command again and send them the new link and code.",
+      );
+    }
+    if (error.code === "expired_token") {
+      return failure(
+        command,
+        4,
+        "device_authorization_expired",
+        false,
+        "Nobody finished the sign-in within 30 minutes; nothing was saved. Run the same login command again and send the customer the new link and code at once.",
+      );
+    }
+    return failure(
+      command,
+      4,
+      "device_authorization_failed",
+      true,
+      "The sign-in service answered unexpectedly; nothing was saved. Run the same login command again; if it fails twice more, ask the customer to try again later.",
+    );
+  }
+  if (error instanceof CredentialStoreUnavailableError) {
+    return failure(
+      command,
+      3,
+      "credential_store_unavailable",
+      false,
+      CREDENTIAL_STORE_UNAVAILABLE_ACTION,
+    );
+  }
+  if (error instanceof ResponseContractError) {
+    return failure(
+      command,
+      7,
+      "response_contract_invalid",
+      false,
+      responseContractAction(command, keyed),
+    );
+  }
+  if (error instanceof PublicResponseTooLargeError) {
+    return failure(
+      command,
+      7,
+      "response_too_large",
+      false,
+      "Retry only after the remote response is repaired.",
+    );
+  }
+  if (isLocalFileError(error))
+    return failure(
+      command,
+      2,
+      "local_state_unavailable",
+      false,
+      `The local CLI state could not be read or written (${error.code}). Check the permissions and free space of the local directories named in the error, then retry. A remote change that already succeeded is not undone.`,
+    );
+  if (looksLikeProblem(error)) {
+    try {
+      const problem = parseSafeProblem(error);
+      return failure(
+        command,
+        7,
+        problem.code,
+        problem.retryable,
+        problem.suggestedAction,
+        undefined,
+        problem.retryAfterSeconds,
+        problem.requestId,
+        problem.docsUrl,
+        ACCOUNT_SENSITIVE_PROBLEMS.has(problem.code) ? actingAs : undefined,
+        problem.message,
+      );
+    } catch {
+      return failure(
+        command,
+        7,
+        "response_contract_invalid",
+        false,
+        responseContractAction(command, keyed),
+      );
+    }
+  }
+  if (looksLikeRemoteObject(error)) {
+    return failure(
+      command,
+      7,
+      "response_contract_invalid",
+      false,
+      responseContractAction(command, keyed),
+    );
+  }
+  if (error instanceof NetworkTransportError) {
+    return failure(
+      command,
+      8,
+      "network_error",
+      true,
+      `The request did not reach the ohmyho.st API, or its answer was cut off. If the agent runs in a sandbox without network access, run the command with network access. Otherwise ${retryAdvice(command, keyed)}.`,
+    );
+  }
+  return failure(command, 1, "internal_error", false, internalErrorAction(command, keyed));
+};
+
+/** A 409 idempotency_key_reused problem, with what its answer carries. */
+const reusedKeyProblem = (error: unknown): ReturnType<typeof parseSafeProblem> | undefined => {
+  if (!looksLikeProblem(error)) return undefined;
+  try {
+    const problem = parseSafeProblem(error);
+    return problem.code === "idempotency_key_reused" ? problem : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+/** One stream and at most three reconnects before an unfinished operation is handed back. */
+const OPERATION_STREAM_CONNECTIONS = 4;
+
+/**
+ * The single DML statement of `database write --statement-file`: a regular UTF-8 file of at most
+ * 64 KiB. Anything else, including a missing file, is refused before any request.
+ */
+const readStatementFile = (path: string): Promise<string> =>
+  readBoundedUtf8File(
+    path,
+    65_536,
+    () => new ProductCliFailure(2, "statement_file_invalid", false, STATEMENT_FILE_INVALID_ACTION),
+  );
+
+/** A regular UTF-8 file of at most maxBytes; anything else is refused with the given failure. */
+const readBoundedUtf8File = async (
+  path: string,
+  maxBytes: number,
+  refusal: () => ProductCliFailure,
+  privateFile = false,
+): Promise<string> => {
+  let file: Awaited<ReturnType<typeof open>>;
+  let before: Awaited<ReturnType<typeof lstat>> | undefined;
+  try {
+    if (privateFile) {
+      if (!isAbsolute(path)) throw refusal();
+      before = await lstat(path);
+      if (
+        !before.isFile() ||
+        before.isSymbolicLink() ||
+        before.nlink !== 1 ||
+        (process.platform !== "win32" &&
+          (before.uid !== process.getuid?.() || (before.mode & 0o077) !== 0))
+      )
+        throw refusal();
+    }
+    file = await open(path, privateFile ? constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) : "r");
+  } catch {
+    throw refusal();
+  }
+  const buffer = Buffer.alloc(maxBytes + 1);
+  try {
+    const stat = await file.stat();
+    if (
+      !stat.isFile() ||
+      stat.size > maxBytes ||
+      (before !== undefined &&
+        (stat.ino !== before.ino ||
+          stat.dev !== before.dev ||
+          stat.nlink !== 1 ||
+          stat.size !== before.size ||
+          (process.platform !== "win32" &&
+            (stat.uid !== process.getuid?.() || (stat.mode & 0o077) !== 0))))
+    )
+      throw refusal();
+    let length = 0;
+    while (length < buffer.length) {
+      const read = await file.read(buffer, length, buffer.length - length, null);
+      if (read.bytesRead === 0) break;
+      length += read.bytesRead;
+    }
+    if (length > maxBytes) throw refusal();
+    return new TextDecoder("utf-8", { fatal: true }).decode(buffer.subarray(0, length));
+  } catch (error) {
+    if (error instanceof ProductCliFailure) throw error;
+    throw refusal();
+  } finally {
+    buffer.fill(0);
+    await file.close();
+  }
+};
+
+/** The create request with the headers of `--headers-file`; a refused file sends nothing. */
+const webhookCreateRequest = async (
+  command: {
+    readonly url: string;
+    readonly eventTypes: readonly import("@ohmyhost/contracts/database-events").DatabaseWebhookEventPattern[];
+    readonly headersFile: string | null;
+  },
+  privateHeaders = false,
+) => {
+  const headersFailure = () =>
+    new ProductCliFailure(2, "headers_file_invalid", false, HEADERS_FILE_INVALID_ACTION);
+  const headers =
+    command.headersFile === null
+      ? undefined
+      : await readBoundedUtf8File(command.headersFile, 8_192, headersFailure, privateHeaders).then(
+          (text: string): unknown => {
+            try {
+              return JSON.parse(text) as unknown;
+            } catch {
+              throw headersFailure();
+            }
+          },
+        );
+  try {
+    return parseDatabaseWebhookCreateRequest({
+      url: command.url,
+      event_types: command.eventTypes,
+      headers,
+    });
+  } catch {
+    throw headersFailure();
+  }
+};
+
+/** The local MCP webhook action reads only an absolute, owner-private header file, never a raw argument. */
+export const readPrivateWebhookCreateRequest = (input: {
+  readonly url: string;
+  readonly eventTypes: readonly import("@ohmyhost/contracts/database-events").DatabaseWebhookEventPattern[];
+  readonly headersFile: string | null;
+}) => webhookCreateRequest(input, true);
+
+/**
+ * The schedule request of `database schedule set`: the statements file is a UTF-8 JSON array, and
+ * the schedule fields are checked by the same contract the service uses. A refused file or field
+ * sends nothing.
+ */
+const scheduleSetRequest = async (
+  command: Extract<ProductCliCommand, { kind: "database-schedule-set" }>,
+): Promise<DatabaseScheduleSetRequest> => {
+  const statementsFailure = () =>
+    new ProductCliFailure(
+      2,
+      "statements_file_invalid",
+      false,
+      SCHEDULE_STATEMENTS_FILE_INVALID_ACTION,
+    );
+  const statements = await readBoundedUtf8File(
+    command.statementsFile,
+    65_536,
+    statementsFailure,
+  ).then((text: string): unknown => {
+    try {
+      return JSON.parse(text) as unknown;
+    } catch {
+      throw statementsFailure();
+    }
+  });
+  // The statements are checked on their own first, so a bad file always answers statements_file_invalid.
+  // The placeholder cadence only lets the contract reach the statements; it is never sent.
+  try {
+    parseDatabaseScheduleSetRequest({ every_seconds: 60, statements, confirm: true });
+  } catch {
+    throw statementsFailure();
+  }
+  try {
+    return parseDatabaseScheduleSetRequest({
+      ...(command.cron === null ? {} : { cron: command.cron }),
+      ...(command.everySeconds === null ? {} : { every_seconds: command.everySeconds }),
+      statements,
+      ...(command.timeoutMs === null ? {} : { timeout_ms: command.timeoutMs }),
+      ...(command.enabled === null ? {} : { enabled: command.enabled }),
+      confirm: true,
+    });
+  } catch {
+    throw new ProductCliFailure(2, "schedule_invalid", false, SCHEDULE_INVALID_ACTION);
+  }
+};
+
+/**
+ * The table of `database table create`: the columns file is a UTF-8 JSON array, and the table, the
+ * columns and the key are checked by the contract the service uses. A refused file sends nothing.
+ */
+const tableCreateRequest = async (
+  command: Extract<ProductCliCommand, { kind: "database-table-create" }>,
+): Promise<DatabaseTableCreateInput> => {
+  const columnsFailure = () =>
+    new ProductCliFailure(2, "columns_file_invalid", false, COLUMNS_FILE_INVALID_ACTION);
+  const columns = await readBoundedUtf8File(command.columnsFile, 65_536, columnsFailure).then(
+    (text: string): unknown => {
+      try {
+        return JSON.parse(text) as unknown;
+      } catch {
+        throw columnsFailure();
+      }
+    },
+  );
+  try {
+    const parsed = parseDatabaseTableCreateRequest({
+      table: command.table,
+      columns,
+      ...(command.primaryKey.length === 0 ? {} : { primaryKey: command.primaryKey }),
+    });
+    return {
+      table: parsed.table,
+      columns: parsed.columns.map(tableColumnInput),
+      primaryKey: parsed.primaryKey,
+    };
+  } catch {
+    throw columnsFailure();
+  }
+};
+
+/** The checked column as the REST body names it; a default that is not set is left out, not sent as null. */
+const tableColumnInput = (column: DatabaseTableColumn): DatabaseTableColumnInput => ({
+  name: column.name,
+  type: column.type,
+  nullable: column.nullable,
+  identity: column.identity,
+  ...(column.default === null ? {} : { default: column.default }),
+});
+
+const psqlUnavailable = (): CliResult =>
+  failure(
+    "database psql",
+    9,
+    "psql_unavailable",
+    false,
+    "Install the PostgreSQL client (psql) and make it available on PATH, or run 'ohmyhost database access create' and connect with your own SQL client.",
+  );
+
+const success = (command: CommandLabel, body: Readonly<Record<string, unknown>>): CliResult => ({
+  exitCode: 0,
+  stdout: `${JSON.stringify({ version: 1, command, ...body })}\n`,
+  stderr: "",
+});
+
+const failure = (
+  command: CommandLabel,
+  exitCode: number,
+  code: string,
+  retryable: boolean,
+  suggestedAction: string,
+  operation?: ReturnType<typeof parseOperation>,
+  retryAfterSeconds?: number,
+  requestId?: string,
+  docsUrl?: string,
+  actingAs?: Readonly<Record<string, unknown>>,
+  message?: string,
+): CliResult => {
+  const document: CliErrorDocument = {
+    version: 1,
+    command,
+    status: "error",
+    ...(operation === undefined ? {} : { operation_id: operation.id }),
+    error: {
+      code,
+      retryable,
+      suggested_action: suggestedAction,
+      ...(retryAfterSeconds === undefined ? {} : { retry_after_seconds: retryAfterSeconds }),
+      ...(requestId === undefined ? {} : { request_id: requestId }),
+      ...(docsUrl === undefined ? {} : { docs_url: docsUrl }),
+      ...(operation?.error === undefined ? {} : { message: operation.error.message }),
+      ...(message === undefined ? {} : { message }),
+      ...(actingAs === undefined ? {} : { acting_as: actingAs }),
+    },
+  };
+  return { exitCode, stdout: `${JSON.stringify(document)}\n`, stderr: "" };
+};
+
+const parsedCommandName = (command: ProductCliCommand): CommandLabel => {
+  if (command.kind === "source-inspect") return "source inspect";
+  if (command.kind === "source-publish") return "source publish";
+  if (command.kind === "source-complete") return "source publish complete";
+  if (command.kind === "source-initialize") return "source initialize";
+  if (command.kind === "source-restore") return "source restore";
+  if (command.kind === "source-read") return `source ${command.action}`;
+  if (command.kind === "export-create") return "export create";
+  if (command.kind === "export-get") return "export get";
+  if (command.kind === "export-download-link") return "export download-link";
+  if (command.kind === "token-create") return "token create";
+  if (command.kind === "token-list") return "token list";
+  if (command.kind === "token-revoke") return "token revoke";
+  if (command.kind === "billing-recharge-get") return "billing recharge get";
+  if (command.kind === "billing-recharge-set") return "billing recharge set";
+  if (command.kind === "billing-checkout") return "billing checkout";
+  if (command.kind === "billing-status") return "billing status";
+  if (command.kind === "billing-portal") return "billing portal";
+  if (command.kind === "credits-account") return "credits account";
+  if (command.kind === "referral-link") return "referral link";
+  if (command.kind === "credits-balance") return "credits balance";
+  if (command.kind === "credits-usage") return "credits usage";
+  if (command.kind === "budget-get") return "budget get";
+  if (command.kind === "budget-set") return "budget set";
+  if (command.kind === "operation-get") return "operation get";
+  if (command.kind === "operation-reconcile") return "operation reconcile";
+  if (command.kind === "feedback-submit") return "feedback submit";
+  if (command.kind === "feedback-status") return "feedback status";
+  if (command.kind === "project-create") return "project create";
+  if (command.kind === "project-data-plan") return "project data plan";
+  if (command.kind === "project-data-change") return "project data change";
+  if (command.kind === "organization-create") return "organization create";
+  if (command.kind === "organization-list") return "organization list";
+  if (command.kind === "organization-use") return "organization use";
+  if (command.kind === "github-connect") return "github connect";
+  if (command.kind === "github-status") return "github status";
+  if (command.kind === "github-disconnect") return "github disconnect";
+  if (command.kind === "connection-begin") return "connection begin";
+  if (command.kind === "connection-list") return "connection list";
+  if (command.kind === "connection-status") return "connection status";
+  if (command.kind === "connection-discover") return "connection discover";
+  if (command.kind === "connection-import") return "connection import";
+  if (command.kind === "connection-disconnect") return "connection disconnect";
+  if (command.kind === "organization-mcp-connections-list")
+    return "organization mcp-connections list";
+  if (command.kind === "organization-mcp-connection-revoke")
+    return "organization mcp-connections revoke";
+  if (command.kind === "project-list") return "project list";
+  if (command.kind === "database-compute-set") return "database compute set";
+  if (command.kind === "database-compute-get") return "database compute get";
+  if (command.kind === "project-context") return "project context";
+  if (command.kind === "project-notes-set") return "project notes set";
+  if (command.kind === "project-status") return "project status";
+  if (command.kind === "project-development-add") return "project dev add";
+  if (command.kind === "project-preview-get") return "project preview get";
+  if (command.kind === "project-preview-open") return "project preview open";
+  if (command.kind === "project-preview-stop") return "project preview stop";
+  if (command.kind === "project-preview-rotate") return "project preview rotate";
+  if (command.kind === "project-dev-access-create") return "project dev-access create";
+  if (command.kind === "project-dev-share-link") return "project dev-share link";
+  if (command.kind === "project-dev-share-rotate") return "project dev-share rotate";
+  if (command.kind === "project-dev-share-revoke") return "project dev-share revoke";
+  if (command.kind === "project-dev-access-mode-set") return "project dev-access mode";
+  if (command.kind === "project-flag-status") return "project flag status";
+  if (command.kind === "project-flag-set") return "project flag set";
+  if (command.kind === "project-handle-check") return "project handle check";
+  if (command.kind === "project-handle-set") return "project handle set";
+  if (command.kind === "database-write") return "database write";
+  if (command.kind === "database-query") return "database query";
+  if (command.kind === "database-access-create") return "database access create";
+  if (command.kind === "database-access-list") return "database access list";
+  if (command.kind === "database-access-revoke") return "database access revoke";
+  if (command.kind === "database-psql") return "database psql";
+  if (command.kind === "database-watch-create") return "database watch create";
+  if (command.kind === "database-watch-list") return "database watch list";
+  if (command.kind === "database-watch-delete") return "database watch delete";
+  if (command.kind === "database-table-create") return "database table create";
+  if (command.kind === "database-webhook-create") return "database webhook create";
+  if (command.kind === "database-webhook-subscription-activate")
+    return "database webhook subscription activate";
+  if (command.kind === "database-webhook-subscription-deactivate")
+    return "database webhook subscription deactivate";
+  if (command.kind === "database-webhook-subscription-status")
+    return "database webhook subscription status";
+  if (command.kind === "database-webhook-list") return "database webhook list";
+  if (command.kind === "database-webhook-get") return "database webhook get";
+  if (command.kind === "database-webhook-delete") return "database webhook delete";
+  if (command.kind === "database-webhook-test") return "database webhook test";
+  if (command.kind === "database-webhook-deliveries") return "database webhook deliveries";
+  if (command.kind === "database-webhook-replay") return "database webhook replay";
+  if (command.kind === "database-schedule-set") return "database schedule set";
+  if (command.kind === "database-schedule-list") return "database schedule list";
+  if (command.kind === "database-schedule-get") return "database schedule get";
+  if (command.kind === "database-schedule-delete") return "database schedule delete";
+  if (command.kind === "database-schedule-runs") return "database schedule runs";
+  if (command.kind === "database-schedule-run") return "database schedule run";
+  if (command.kind === "database-executions") return "database executions";
+  if (command.kind === "source-auto-deploy-set") return "source auto-deploy set";
+  if (command.kind === "source-auto-deploy-status") return "source auto-deploy status";
+  if (command.kind === "domain-cloudflare-authorize") return "domain cloudflare authorize";
+  if (command.kind === "domain-cloudflare-status") return "domain cloudflare status";
+  if (command.kind === "domain-cloudflare-apply") return "domain cloudflare apply";
+  if (command.kind === "paid-domain-plan") return "domain paid plan";
+  if (command.kind === "paid-domain-apply") return "domain paid apply";
+  if (command.kind === "paid-domain-status") return "domain paid status";
+  if (command.kind === "paid-domain-delete") return "domain paid delete";
+  if (command.kind === "rollback-plan") return "rollback plan";
+  if (command.kind === "promotion-plan") return "deployment promote plan";
+  if (command.kind === "deployment-logs") return "deployment logs";
+  if (command.kind === "deployment-list") return "deployment list";
+  if (command.kind === "deployment-get") return "deployment get";
+  if (command.kind === "promote") return "deployment promote";
+  if (command.kind === "delete-plan") return "delete plan";
+  if (command.kind === "secret-list") return "secret list";
+  if (command.kind === "function-runs") return "function runs";
+  if (command.kind === "secret-set") return "secret set";
+  if (command.kind === "secret-delete") return "secret delete";
+  if (command.kind === "native-auth") return "auth";
+  if (command.kind === "shared-mail" || command.kind === "managed-mail") return command.label;
+  if (command.kind === "profile-list") return "profile list";
+  return command.kind;
+};
+
+const boundedSignal = (parent: AbortSignal, timeoutMs: number): AbortSignal =>
+  AbortSignal.any([parent, AbortSignal.timeout(timeoutMs)]);
+
+const runBounded = async <T>(
+  operation: (signal: AbortSignal) => Promise<T>,
+  parent: AbortSignal,
+  timeoutMs: number,
+): Promise<T> => {
+  const signal = boundedSignal(parent, timeoutMs);
+  return new Promise<T>((resolve, reject) => {
+    const cleanup = (): void => signal.removeEventListener("abort", abort);
+    const abort = (): void => {
+      cleanup();
+      reject(signal.reason);
+    };
+    if (signal.aborted) {
+      abort();
+      return;
+    }
+    signal.addEventListener("abort", abort, { once: true });
+    operation(signal).then(
+      (value) => {
+        cleanup();
+        resolve(value);
+      },
+      (error: unknown) => {
+        cleanup();
+        reject(error);
+      },
+    );
+  });
+};
+
+const throwIfAborted = (signal: AbortSignal): void => {
+  if (signal.aborted) throw signal.reason;
+};
+
+const isCancellation = (error: unknown): boolean =>
+  error instanceof DOMException && error.name === "AbortError";
+
+const isTimeout = (error: unknown): boolean =>
+  error instanceof DOMException && error.name === "TimeoutError";
+
+const looksLikeProblem = (error: unknown): boolean =>
+  typeof error === "object" &&
+  error !== null &&
+  ("code" in error || "status" in error || "suggested_action" in error);
+
+/**
+ * Node filesystem errors describe local state, never a remote response. Network codes such as ECONNRESET or EPIPE
+ * are not local; ENOENT is local only when it names the path that is missing.
+ */
+const LOCAL_FILE_ERROR_CODES: ReadonlySet<string> = new Set([
+  "EACCES",
+  "EPERM",
+  "ENOSPC",
+  "EROFS",
+  "EDQUOT",
+  "EMFILE",
+  "ENFILE",
+  "EEXIST",
+  "EISDIR",
+  "ENOTDIR",
+  "EBUSY",
+  "ENAMETOOLONG",
+]);
+const isLocalFileError = (error: unknown): error is Error & { code: string } =>
+  error instanceof Error &&
+  "code" in error &&
+  typeof error.code === "string" &&
+  (LOCAL_FILE_ERROR_CODES.has(error.code) ||
+    (error.code === "ENOENT" && "path" in error && typeof error.path === "string"));
+
+const looksLikeRemoteObject = (error: unknown): boolean =>
+  typeof error === "object" && error !== null && !(error instanceof Error);
+
+const diagnosticDescriptor = (
+  error: unknown,
+  signal: AbortSignal,
+): Omit<Parameters<DiagnosticSink["record"]>[0], "correlationId"> => {
+  if (signal.aborted || isCancellation(error)) {
+    return { category: "cancelled", subsystem: "runtime", errorKind: "cancelled" };
+  }
+  if (isTimeout(error)) {
+    return { category: "timeout", subsystem: "runtime", errorKind: "timeout" };
+  }
+  if (error instanceof CredentialStoreUnavailableError) {
+    return {
+      category: "credential_store",
+      subsystem: "credential_store",
+      errorKind: "unavailable",
+    };
+  }
+  if (error instanceof SecretInputError) {
+    return { category: "configuration", subsystem: "runtime", errorKind: "invalid_response" };
+  }
+  if (error instanceof WorkosContractError) {
+    return {
+      category: "device_authorization",
+      subsystem: "authentication",
+      errorKind: "invalid_response",
+    };
+  }
+  if (error instanceof ResponseContractError || error instanceof PublicResponseTooLargeError) {
+    return { category: "response_contract", subsystem: "sdk", errorKind: "invalid_response" };
+  }
+  if (error instanceof NetworkTransportError) {
+    return { category: "network", subsystem: "sdk", errorKind: "network_transport" };
+  }
+  if (
+    error instanceof ProviderCapabilityBlockedError ||
+    (error instanceof ProductCliFailure && error.code === "blocked_prerequisite")
+  ) {
+    return { category: "provider_blocked", subsystem: "lifecycle", errorKind: "blocked" };
+  }
+  if (error instanceof ProductCliFailure) {
+    if (error.code === "request_timeout") {
+      return { category: "timeout", subsystem: "lifecycle", errorKind: "timeout" };
+    }
+    if (error.code === "token_refresh_failed" || error.code === "token_revocation_failed") {
+      return { category: "network", subsystem: "lifecycle", errorKind: "network_transport" };
+    }
+    if (error.code === "device_token_expiry_missing") {
+      return {
+        category: "response_contract",
+        subsystem: "authentication",
+        errorKind: "invalid_response",
+      };
+    }
+    if (error.code === "authentication_required") {
+      return {
+        category: "credential_store",
+        subsystem: "credential_store",
+        errorKind: "unavailable",
+      };
+    }
+  }
+  if (isLocalFileError(error))
+    return { category: "configuration", subsystem: "runtime", errorKind: "unavailable" };
+  if (looksLikeProblem(error)) {
+    try {
+      parseSafeProblem(error);
+      return { category: "remote_problem", subsystem: "sdk", errorKind: "remote_problem" };
+    } catch {
+      return { category: "response_contract", subsystem: "sdk", errorKind: "invalid_response" };
+    }
+  }
+  if (looksLikeRemoteObject(error)) {
+    return { category: "response_contract", subsystem: "sdk", errorKind: "invalid_response" };
+  }
+  return { category: "internal", subsystem: "runtime", errorKind: "unexpected" };
+};

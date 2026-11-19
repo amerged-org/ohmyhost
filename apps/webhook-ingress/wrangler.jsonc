@@ -1,0 +1,46 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-workos-webhook-poc-private-fullstack",
+  "account_id": "00000000000000000000000000000001",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-08-19",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "secrets": {
+    "required": [
+      "GITHUB_WEBHOOK_SECRET",
+      "GITHUB_WEBHOOK_ADDITIONAL_SECRETS_JSON",
+      "WORKOS_WEBHOOK_SECRET",
+      "WORKOS_WEBHOOK_ADDITIONAL_SECRETS_JSON",
+      "STRIPE_WEBHOOK_SECRET",
+      "RESEND_WEBHOOK_SECRET",
+    ],
+  },
+  "vars": {
+    "STRIPE_ACCOUNT_ID": "acct_00000W39Example2",
+    "STRIPE_MODE": "test",
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": false,
+      "persist": true,
+    },
+  },
+  "services": [
+    {
+      "binding": "CONTROL_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "WebhookIngressRuntime",
+    },
+    {
+      "binding": "RESEND_INGRESS_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "MailResendIngressRuntime",
+    },
+  ],
+}

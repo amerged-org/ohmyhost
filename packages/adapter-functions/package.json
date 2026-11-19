@@ -1,0 +1,23 @@
+{
+  "name": "@ohmyhost/adapter-functions",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "coverage": "vitest run --root ../.. packages/adapter-functions/src --coverage --coverage.include='packages/adapter-functions/src/**/*.ts' --coverage.reporter=text --coverage.reporter=json-summary",
+    "test": "vitest run --root ../.. packages/adapter-functions/src",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo"
+  },
+  "dependencies": {
+    "@ohmyhost/contracts": "workspace:*",
+    "@ohmyhost/platform": "workspace:*"
+  }
+}

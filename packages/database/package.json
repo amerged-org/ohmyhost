@@ -1,0 +1,56 @@
+{
+  "name": "@ohmyhost/database",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./worker-postgres-targets": {
+      "source": "./src/worker-postgres-targets.ts",
+      "types": "./dist/worker-postgres-targets.d.ts",
+      "import": "./dist/worker-postgres-targets.js"
+    },
+    "./worker-postgres": {
+      "source": "./src/worker-postgres.ts",
+      "types": "./dist/worker-postgres.d.ts",
+      "import": "./dist/worker-postgres.js"
+    },
+    "./workos-persistence": {
+      "source": "./src/workos-persistence.ts",
+      "types": "./dist/workos-persistence.d.ts",
+      "import": "./dist/workos-persistence.js"
+    },
+    "./worker-postgres-control": {
+      "source": "./src/worker-postgres-control.ts",
+      "types": "./dist/worker-postgres-control.d.ts",
+      "import": "./dist/worker-postgres-control.js"
+    },
+    "./provisioning-persistence": {
+      "source": "./src/provisioning-persistence.ts",
+      "types": "./dist/provisioning-persistence.d.ts",
+      "import": "./dist/provisioning-persistence.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo",
+    "migrate": "node-pg-migrate --config-file node-pg-migrate.config.mjs",
+    "test": "vitest run --root ../.. packages/database"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "1.2.0",
+    "@ohmyhost/contracts": "workspace:*",
+    "@ohmyhost/project-handles": "workspace:*",
+    "@ohmyhost/platform": "workspace:*",
+    "pg": "8.22.0"
+  },
+  "devDependencies": {
+    "@ohmyhost/provider-pgcf": "workspace:*",
+    "@types/pg": "8.20.0",
+    "node-pg-migrate": "9.0.0"
+  }
+}

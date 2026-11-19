@@ -1,0 +1,33 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-billing-production",
+  "account_id": "00000000000000000000000000000001",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-09-07",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": {
+    "STRIPE_ACCOUNT_ID": "acct_00000W39Example6",
+    "STRIPE_MODE": "live",
+    "STRIPE_PAID_PRICE_ID": "price_0000000000000W39Example7",
+    "STRIPE_TOPUP_PRICE_ID": "price_0000000000000W39Example8",
+    "STRIPE_PORTAL_CONFIGURATION_ID": "bpc_0000000000000W39Example9",
+    "BILLING_RETURN_ORIGIN": "https://app.ohmyho.st",
+  },
+  // Install the production-only STRIPE_SECRET_KEY; the Control API owns the inbox clock.
+  "triggers": { "crons": [] },
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "services": [
+    {
+      "binding": "GROWTH_STRIPE_CUSTOMER_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "GrowthStripeCustomerRuntime",
+    },
+    {
+      "binding": "CONTROL_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "BillingRuntime",
+    },
+  ],
+}

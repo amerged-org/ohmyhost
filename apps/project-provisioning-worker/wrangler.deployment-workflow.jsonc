@@ -1,0 +1,95 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyhost-deployment-workflow",
+  "main": "src/deployment-workflow-main.ts",
+  "compatibility_date": "2026-08-19",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": { "RUNTIME_CONFIGURATION_STATE": "disabled" },
+  "services": [
+    {
+      "binding": "NEXT_CACHE_RETIREMENT",
+      "service": "ohmyho-next-cache-sandbox",
+      "entrypoint": "NextCacheRetirementRuntime",
+    },
+    {
+      "binding": "NATIVE_AUTH_RESOURCE_RUNTIME",
+      "service": "ohmyho-control-store-disabled",
+      "entrypoint": "NativeAuthResourceRuntime",
+    },
+    {
+      "binding": "NATIVE_AUTH_ADMIN_US",
+      "service": "ohmyho-native-auth-development-us",
+      "entrypoint": "NativePolicyService",
+    },
+    {
+      "binding": "NATIVE_AUTH_ADMIN_EU",
+      "service": "ohmyho-native-auth-development-eu",
+      "entrypoint": "NativePolicyService",
+    },
+    {
+      "binding": "SOURCE_FETCHER",
+      "service": "ohmyho-source-fetcher-sandbox",
+      "entrypoint": "SourceFetcherService",
+    },
+    {
+      "binding": "BUILD_RUNNER",
+      "service": "ohmyho-build-runner-sandbox",
+      "entrypoint": "BuildRunnerService",
+    },
+    {
+      "binding": "RECOVERY_INVOKER",
+      "service": "ohmyho-recovery-container-sandbox",
+      "entrypoint": "RecoveryContainerService",
+    },
+    {
+      "binding": "RUNTIME_SECRET_DELIVERY",
+      "service": "ohmyho-runtime-secret-delivery-sandbox",
+      "entrypoint": "RuntimeSecretDeliveryService",
+    },
+    {
+      "binding": "NEON_MANAGEMENT",
+      "service": "ohmyho-neon-management-sandbox",
+      "entrypoint": "NeonManagementService",
+    },
+    {
+      "binding": "R2_MANAGEMENT",
+      "service": "ohmyho-r2-management-sandbox",
+      "entrypoint": "R2ManagementService",
+    },
+    {
+      "binding": "SES_MANAGEMENT",
+      "service": "ohmyho-ses-management-sandbox",
+      "entrypoint": "ResendMailManagementService",
+    },
+    {
+      "binding": "CLOUDFLARE_DOMAIN_MANAGEMENT",
+      "service": "ohmyho-cloudflare-domain-management-sandbox",
+      "entrypoint": "CloudflareDomainManagementService",
+    },
+    {
+      "binding": "WFP_MANAGEMENT",
+      "service": "ohmyho-wfp-management-sandbox",
+      "entrypoint": "WfpManagementService",
+    },
+  ],
+  "workflows": [
+    {
+      "name": "ohmyhost-deployment-workflow-v1",
+      "binding": "DEPLOYMENT_WORKFLOW",
+      "class_name": "DeploymentWorkflow",
+    },
+    {
+      "name": "ohmyhost-provider-reconciliation-v1",
+      "binding": "PROVIDER_RECONCILIATION_WORKFLOW",
+      "class_name": "ProviderReconciliationWorkflow",
+    },
+    {
+      "name": "ohmyhost-project-provisioning-v1",
+      "binding": "PROJECT_PROVISIONING_WORKFLOW",
+      "class_name": "ProjectProvisioningWorkflow",
+      "script_name": "ohmyhost-project-provisioning-workflow",
+    },
+  ],
+}

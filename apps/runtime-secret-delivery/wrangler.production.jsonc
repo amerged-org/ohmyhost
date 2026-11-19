@@ -1,0 +1,56 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-runtime-secret-delivery-production",
+  "account_id": "00000000000000000000000000000001",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-08-21",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "secrets": {
+    "required": ["ENVIRONMENT_SECRET_KEY_BASE64", "ENVIRONMENT_SECRET_ADDITIONAL_KEYS_JSON"],
+  },
+  "vars": {
+    "RUNTIME_CONFIGURATION_STATE": "configured",
+    "ENVIRONMENT_SECRET_KEY_VERSION": "20261106",
+  },
+  "services": [
+    {
+      "binding": "PROJECT_PREVIEW_AUTHORITY",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "PreviewTokenLookupRuntime",
+    },
+    {
+      "binding": "PREVIEW_SECRET_AUTHORITY",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "PreviewSecretAuthorityRuntime",
+    },
+    {
+      "binding": "PREVIEW_MAIL_GATEWAY",
+      "service": "ohmyho-mail-gateway-production",
+      "entrypoint": "MailEgressEntrypoint",
+    },
+    {
+      "binding": "PREVIEW_STORAGE_GATEWAY",
+      "service": "ohmyho-storage-gateway-production",
+      "entrypoint": "StorageGatewayRelayEntrypoint",
+    },
+    {
+      "binding": "PREVIEW_AI_GATEWAY",
+      "service": "ohmyho-ai-gateway-production",
+    },
+    {
+      "binding": "RUNTIME_SECRET_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "RuntimeSecretDeliveryRuntime",
+    },
+    {
+      "binding": "WFP_MANAGEMENT",
+      "service": "ohmyho-wfp-management-production",
+      "entrypoint": "WfpManagementService",
+    },
+  ],
+  "triggers": { "crons": ["*/1 * * * *"] },
+  // Retain the independent Prod v1 reader; the saved additional ring supplies writer 20261106.
+}

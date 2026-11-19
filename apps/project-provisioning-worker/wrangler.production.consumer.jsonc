@@ -1,0 +1,56 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-project-provisioning-consumer-production",
+  "account_id": "00000000000000000000000000000001",
+  "main": "src/consumer-main.ts",
+  "compatibility_date": "2026-08-19",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "vars": {
+    "RUNTIME_CONFIGURATION_STATE": "configured",
+  },
+  "services": [
+    {
+      "binding": "PROJECT_WORKFLOW_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "ProjectWorkflowRuntime",
+    },
+    {
+      "binding": "PROJECT_DISPATCH_RUNTIME",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "ProjectDispatchRuntime",
+    },
+    {
+      "binding": "MANAGED_SOURCE_PROCESSOR",
+      "service": "ohmyho-control-api-production",
+      "entrypoint": "ManagedSourceProcessor",
+    },
+  ],
+  "workflows": [
+    {
+      "name": "ohmyho-project-provisioning-v1-production",
+      "binding": "PROJECT_PROVISIONING_WORKFLOW",
+      "class_name": "ProjectProvisioningWorkflow",
+      "script_name": "ohmyho-project-provisioning-workflow-production",
+    },
+    {
+      "name": "ohmyho-deployment-workflow-v1-production",
+      "binding": "DEPLOYMENT_WORKFLOW",
+      "class_name": "DeploymentWorkflow",
+      "script_name": "ohmyho-deployment-workflow-production",
+    },
+  ],
+  "queues": {
+    "consumers": [
+      {
+        "queue": "ohmyho-project-provisioning-production",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 30,
+        "dead_letter_queue": "ohmyho-project-provisioning-dlq-production",
+      },
+    ],
+  },
+}

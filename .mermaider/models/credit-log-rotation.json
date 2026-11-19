@@ -1,0 +1,322 @@
+{
+  "version": 1,
+  "review": "reviewed",
+  "diagram": {
+    "id": "credit-log-rotation",
+    "title": "Credit log — daily rotation to R2 and the usage report",
+    "family": "process",
+    "syntax": "sequence",
+    "provenance": "curated",
+    "context": "implemented",
+    "nodes": [
+      {
+        "id": "01_cron",
+        "label": "Cron trigger",
+        "evidence": [
+          {
+            "line": 15,
+            "path": "apps/credit-service/wrangler.production.jsonc",
+            "sha256": "981a9ba729879f3a514698a056d38b0d62a153cfa8512bb0edeb0c25acafea23"
+          },
+          {
+            "line": 29,
+            "path": "apps/credit-service/src/worker-main.ts",
+            "sha256": "d1eae3886149637a41b212f7ef2899b080cec8335d97c761679d9a27ec190321",
+            "symbol": "ROTATION_CRON"
+          },
+          {
+            "line": 135,
+            "path": "apps/credit-service/src/worker-main.ts",
+            "sha256": "a920554e98733eeafa9488f05a530606c400d008d78c9e82c8062af7bcf5f796",
+            "symbol": "runUsage"
+          }
+        ]
+      },
+      {
+        "id": "02_service",
+        "label": "Credit Service",
+        "evidence": [
+          {
+            "line": 115,
+            "path": "apps/credit-service/src/worker-main.ts",
+            "sha256": "a92a34cd16c7b7f4a770bbdcc6f46ebf0f8aafb4c81d8db4421cb2195fd6e04b",
+            "symbol": "runRotation"
+          },
+          {
+            "line": 176,
+            "path": "apps/credit-service/src/worker-main.ts",
+            "sha256": "9913ed94ba9b2be05221729814c85cf837e29d86c31e0f043c9e340efb4f7371",
+            "symbol": "CreditServiceRuntime"
+          }
+        ]
+      },
+      {
+        "id": "03_core",
+        "label": "Core credit runtime",
+        "evidence": [
+          {
+            "line": 186,
+            "path": "apps/control-store/src/catalog/credit/runtime.ts",
+            "sha256": "844b12ac4786f407074de842adb590a375e085439e8f7258a552f643e572ab15",
+            "symbol": "createCreditCommands"
+          }
+        ]
+      },
+      {
+        "id": "04_log",
+        "label": "Credit log bucket (R2)",
+        "evidence": [
+          {
+            "line": 206,
+            "path": "apps/credit-service/src/rotation.ts",
+            "sha256": "03c6e171b0b0a6e8dd08cbe02cbc3c0c97f531cbe2950b3dc572e034d4cb7450",
+            "symbol": "rotateCreditLog"
+          },
+          {
+            "line": 169,
+            "path": "apps/credit-service/src/rotation.ts",
+            "sha256": "523462b42cf51e8198150ca56753f6d68bdfd79c0c6e5769eb2bf4716e493833",
+            "symbol": "createOnce"
+          }
+        ]
+      },
+      {
+        "id": "05_api",
+        "label": "Control API",
+        "evidence": [
+          {
+            "line": 212,
+            "path": "apps/control-api/src/d1-credits.ts",
+            "sha256": "538ba0d7226365161c2cb05eaa63e1404ff1a5ef4e26f1e933a205756ae314d0",
+            "symbol": "createD1CreditManagement"
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "steps": [
+      {
+        "from": "01_cron",
+        "to": "02_service",
+        "label": "Rotate: 00:00 UTC cron, or the end of an hourly pass",
+        "kind": "message",
+        "evidence": [
+          {
+            "line": 29,
+            "path": "apps/credit-service/src/worker-main.ts",
+            "sha256": "d1eae3886149637a41b212f7ef2899b080cec8335d97c761679d9a27ec190321",
+            "symbol": "ROTATION_CRON"
+          },
+          {
+            "line": 115,
+            "path": "apps/credit-service/src/worker-main.ts",
+            "sha256": "a92a34cd16c7b7f4a770bbdcc6f46ebf0f8aafb4c81d8db4421cb2195fd6e04b",
+            "symbol": "runRotation"
+          },
+          {
+            "line": 135,
+            "path": "apps/credit-service/src/worker-main.ts",
+            "sha256": "a920554e98733eeafa9488f05a530606c400d008d78c9e82c8062af7bcf5f796",
+            "symbol": "runUsage"
+          }
+        ]
+      },
+      {
+        "from": "02_service",
+        "to": "03_core",
+        "label": "Read every usage cursor; wait until all passed 00:00 UTC",
+        "kind": "message",
+        "evidence": [
+          {
+            "line": 206,
+            "path": "apps/credit-service/src/rotation.ts",
+            "sha256": "03c6e171b0b0a6e8dd08cbe02cbc3c0c97f531cbe2950b3dc572e034d4cb7450",
+            "symbol": "rotateCreditLog"
+          },
+          {
+            "line": 186,
+            "path": "apps/control-store/src/catalog/credit/runtime.ts",
+            "sha256": "844b12ac4786f407074de842adb590a375e085439e8f7258a552f643e572ab15",
+            "symbol": "createCreditCommands"
+          }
+        ]
+      },
+      {
+        "from": "02_service",
+        "to": "03_core",
+        "label": "Page the log rows before today 00:00 UTC",
+        "kind": "message",
+        "evidence": [
+          {
+            "line": 97,
+            "path": "apps/credit-service/src/rotation.ts",
+            "sha256": "f07c64849dcbc9c60469f7e0b08f747030b63f82d81a2d25a7d4f7a9a22f76cd",
+            "symbol": "scan"
+          },
+          {
+            "line": 186,
+            "path": "apps/control-store/src/catalog/credit/runtime.ts",
+            "sha256": "844b12ac4786f407074de842adb590a375e085439e8f7258a552f643e572ab15",
+            "symbol": "createCreditCommands"
+          }
+        ]
+      },
+      {
+        "from": "02_service",
+        "to": "04_log",
+        "label": "Create each day and shard object once; an existing one must match",
+        "kind": "message",
+        "evidence": [
+          {
+            "line": 169,
+            "path": "apps/credit-service/src/rotation.ts",
+            "sha256": "523462b42cf51e8198150ca56753f6d68bdfd79c0c6e5769eb2bf4716e493833",
+            "symbol": "createOnce"
+          },
+          {
+            "line": 206,
+            "path": "apps/credit-service/src/rotation.ts",
+            "sha256": "03c6e171b0b0a6e8dd08cbe02cbc3c0c97f531cbe2950b3dc572e034d4cb7450",
+            "symbol": "rotateCreditLog"
+          }
+        ]
+      },
+      {
+        "from": "02_service",
+        "to": "04_log",
+        "label": "Create the day manifest the same way",
+        "kind": "message",
+        "evidence": [
+          {
+            "line": 206,
+            "path": "apps/credit-service/src/rotation.ts",
+            "sha256": "03c6e171b0b0a6e8dd08cbe02cbc3c0c97f531cbe2950b3dc572e034d4cb7450",
+            "symbol": "rotateCreditLog"
+          }
+        ]
+      },
+      {
+        "from": "02_service",
+        "to": "04_log",
+        "label": "Read every shard back; count and SHA-256 must match",
+        "kind": "message",
+        "evidence": [
+          {
+            "line": 206,
+            "path": "apps/credit-service/src/rotation.ts",
+            "sha256": "03c6e171b0b0a6e8dd08cbe02cbc3c0c97f531cbe2950b3dc572e034d4cb7450",
+            "symbol": "rotateCreditLog"
+          }
+        ]
+      },
+      {
+        "from": "02_service",
+        "to": "03_core",
+        "label": "Delete the archived rows, as the last step",
+        "kind": "message",
+        "evidence": [
+          {
+            "line": 206,
+            "path": "apps/credit-service/src/rotation.ts",
+            "sha256": "03c6e171b0b0a6e8dd08cbe02cbc3c0c97f531cbe2950b3dc572e034d4cb7450",
+            "symbol": "rotateCreditLog"
+          },
+          {
+            "line": 186,
+            "path": "apps/control-store/src/catalog/credit/runtime.ts",
+            "sha256": "844b12ac4786f407074de842adb590a375e085439e8f7258a552f643e572ab15",
+            "symbol": "createCreditCommands"
+          }
+        ]
+      },
+      {
+        "from": "03_core",
+        "to": "02_service",
+        "label": "Deleted count; a mismatch is reported as a problem",
+        "kind": "reply",
+        "evidence": [
+          {
+            "line": 206,
+            "path": "apps/credit-service/src/rotation.ts",
+            "sha256": "03c6e171b0b0a6e8dd08cbe02cbc3c0c97f531cbe2950b3dc572e034d4cb7450",
+            "symbol": "rotateCreditLog"
+          }
+        ]
+      },
+      {
+        "from": "05_api",
+        "to": "02_service",
+        "label": "Usage report for an organization",
+        "kind": "message",
+        "evidence": [
+          {
+            "line": 212,
+            "path": "apps/control-api/src/d1-credits.ts",
+            "sha256": "538ba0d7226365161c2cb05eaa63e1404ff1a5ef4e26f1e933a205756ae314d0",
+            "symbol": "createD1CreditManagement"
+          },
+          {
+            "line": 177,
+            "path": "apps/credit-service/src/worker-main.ts",
+            "sha256": "c0b725f2b7b4d887c8a99006a1f72a82ec31e79cc3b1fedc02edcf0e170dde84",
+            "symbol": "CreditServiceRuntime.readUsage"
+          }
+        ]
+      },
+      {
+        "from": "02_service",
+        "to": "03_core",
+        "label": "Read the organization's rows still in the Core",
+        "kind": "message",
+        "evidence": [
+          {
+            "line": 87,
+            "path": "apps/credit-service/src/report.ts",
+            "sha256": "95d5afd9f41b1ecb88042287488bf61dfbdff8b9f94104255753eeb49b07d9fa",
+            "symbol": "readUsage"
+          },
+          {
+            "line": 186,
+            "path": "apps/control-store/src/catalog/credit/runtime.ts",
+            "sha256": "844b12ac4786f407074de842adb590a375e085439e8f7258a552f643e572ab15",
+            "symbol": "createCreditCommands"
+          }
+        ]
+      },
+      {
+        "from": "02_service",
+        "to": "04_log",
+        "label": "Read its shard of each rotated day",
+        "kind": "message",
+        "evidence": [
+          {
+            "line": 66,
+            "path": "apps/credit-service/src/report.ts",
+            "sha256": "6f8a39d06b750f0704820aeaa16272b65b2815706d656e1032545427381ba2f5",
+            "symbol": "readArchivedDay"
+          },
+          {
+            "line": 87,
+            "path": "apps/credit-service/src/report.ts",
+            "sha256": "95d5afd9f41b1ecb88042287488bf61dfbdff8b9f94104255753eeb49b07d9fa",
+            "symbol": "readUsage"
+          }
+        ]
+      },
+      {
+        "from": "02_service",
+        "to": "05_api",
+        "label": "Rows merged by key, ordered by time",
+        "kind": "reply",
+        "evidence": [
+          {
+            "line": 87,
+            "path": "apps/credit-service/src/report.ts",
+            "sha256": "95d5afd9f41b1ecb88042287488bf61dfbdff8b9f94104255753eeb49b07d9fa",
+            "symbol": "readUsage"
+          }
+        ]
+      }
+    ]
+  }
+}

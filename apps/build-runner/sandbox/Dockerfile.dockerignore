@@ -1,0 +1,9 @@
+**
+!apps/build-runner/sandbox/agent.mjs
+!apps/build-runner/sandbox/build-runtime.mjs
+!apps/build-runner/sandbox/open-next-patch.mjs
+!apps/build-runner/sandbox/next-writable-cache.mjs
+!packages/contracts/src/framework-build-script.mjs
+!packages/contracts/src/browser-capabilities.ts
+!packages/contracts/src/customer-auth-admission.ts
+!packages/contracts/src/egress-origin.ts

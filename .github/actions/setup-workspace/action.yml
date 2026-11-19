@@ -1,0 +1,105 @@
+name: Set up the verification workspace
+description: Install the pinned toolchain and restore the dependency store and the newest compiled task outputs without sharing databases.
+inputs:
+  postgres:
+    description: Expose verified PostgreSQL 18 binaries for isolated test clusters.
+    default: "false"
+  opentofu:
+    description: Install the pinned OpenTofu binary for integration tests.
+    default: "false"
+outputs:
+  turbo-cache-key:
+    description: The key under which the build job saves this commit's compiled task outputs.
+    value: ${{ steps.turbo.outputs.cache-primary-key }}
+  turbo-cache-hit:
+    description: "true when this commit's own compiled task outputs were restored, so they must not be saved again."
+    value: ${{ steps.turbo.outputs.cache-hit }}
+runs:
+  using: composite
+  steps:
+    # The MacBook runner image bakes the ordinary npm pnpm package of the same version, because the
+    # standalone launcher fails on wrangler's `--env-file /dev/null`.
+    - name: Install pnpm
+      uses: pnpm/action-setup@ff378ebe6b225b0680b81c1ad4498ae0d1d3a5e3
+      with:
+        version: 10.28.2
+        run_install: false
+
+    - name: Install Node.js and restore the pnpm store
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+      with:
+        node-version: 24.6.0
+        cache: pnpm
+        cache-dependency-path: pnpm-lock.yaml
+
+    - name: Read the toolchain versions that scope the cache key
+      id: toolchain
+      shell: bash
+      run: |
+        node_version=$(node --version)
+        echo "node=${node_version#v}" >> "$GITHUB_OUTPUT"
+        echo "pnpm=$(pnpm --version)" >> "$GITHUB_OUTPUT"
+
+    # Every job restores the newest compiled task outputs; only the build job saves them, because
+    # a second copy per job would fill the 10 GB repository cache with the same bytes.
+    # Turbo still hashes every task input and runs what no restored entry matches, so a restored
+    # entry from an older commit only makes an identical build faster.
+    - name: Restore compiled task outputs
+      id: turbo
+      uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: .turbo/cache
+        key: turbo-v2-${{ runner.os }}-${{ runner.arch }}-node${{ steps.toolchain.outputs.node }}-pnpm${{ steps.toolchain.outputs.pnpm }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', 'turbo.json') }}-${{ github.sha }}
+        # This commit's entry first, then the newest entry of an earlier commit built with the same inputs.
+        restore-keys: |
+          turbo-v2-${{ runner.os }}-${{ runner.arch }}-node${{ steps.toolchain.outputs.node }}-pnpm${{ steps.toolchain.outputs.pnpm }}-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', 'turbo.json') }}-
+
+    - name: Install dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile
+
+    - name: Install preview spike worker dependencies
+      shell: bash
+      run: |
+        if test -f scripts/preview-spike/worker/package-lock.json; then
+          pnpm exec npm --prefix scripts/preview-spike/worker ci --ignore-scripts --no-audit --no-fund
+        fi
+
+    - name: Build Product CLI contracts
+      shell: bash
+      run: pnpm --filter @ohmyhost/contracts build
+
+    - name: Install OpenTofu
+      if: inputs.opentofu == 'true'
+      uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4
+      with:
+        tofu_version: 1.12.6
+        tofu_wrapper: false
+
+    - name: Expose PostgreSQL 18 tools
+      if: inputs.postgres == 'true'
+      shell: bash
+      run: |
+        postgres_bin=/usr/lib/postgresql/18/bin
+        if ! test -x "$postgres_bin/initdb"; then
+          # Runner images may not yet contain 18; retain the verified PGDG fallback.
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl --retry 3 --retry-all-errors --retry-delay 2 --retry-max-time 180 \
+            --connect-timeout 15 --max-time 60 -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-18 postgresql-client-18
+        fi
+        for binary in initdb postgres pg_ctl psql pg_dump pg_restore createdb createuser dropdb dropuser; do
+          test -x "$postgres_bin/$binary"
+          version=$("$postgres_bin/$binary" --version)
+          [[ "$version" =~ \(PostgreSQL\)\ 18([.[:space:]]|$) ]] || {
+            echo "Expected PostgreSQL 18: $binary" >&2
+            exit 1
+          }
+        done
+        "$postgres_bin/initdb" --version
+        echo "$postgres_bin" >> "$GITHUB_PATH"
+        echo "OHMYHOST_TEST_POSTGRES_BIN=$postgres_bin" >> "$GITHUB_ENV"

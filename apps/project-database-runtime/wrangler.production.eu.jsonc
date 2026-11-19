@@ -1,0 +1,52 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "account_id": "00000000000000000000000000000001",
+  "name": "ohmyho-project-database-production-eu",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-08-24",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  // Persist only the runtime's own redacted failure lines (event, SQLSTATE, closed reason);
+  // invocation logs stay off so request URLs and query strings are never retained.
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "persist": true,
+      "invocation_logs": false,
+    },
+    "traces": { "enabled": false },
+  },
+  "vars": {
+    "DATABASE_REGION": "eu",
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "DATABASE_ENVIRONMENTS",
+        "class_name": "ProjectDatabaseEnvironment",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["ProjectDatabaseEnvironment"],
+    },
+  ],
+  "services": [
+    {
+      "binding": "PROJECT_PREVIEW_AUTHORITY",
+      "service": "ohmyho-control-store-production",
+      "entrypoint": "PreviewDatabaseAuthorityRuntime",
+    },
+    {
+      "binding": "OHMYHOST_MAIL_GATEWAY",
+      "entrypoint": "DatabaseMailEntrypoint",
+      "service": "ohmyho-mail-gateway-production",
+    },
+  ],
+}

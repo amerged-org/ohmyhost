@@ -1,0 +1,11 @@
+*
+!releases/
+!releases/**
+!pages/
+!pages/**
+!logos/
+!logos/**
+!fonts/
+!fonts/**
+!og/
+!og/**

@@ -1,0 +1,56 @@
+{
+  "name": "@ohmyhost/project-provisioning-worker",
+  "version": "0.0.0",
+  "private": true,
+  "ohmyhost": {
+    "deployment": "production",
+    "fakeProviderBoundary": {
+      "typescriptProject": "tsconfig.build.json",
+      "artifactRoot": "dist",
+      "entrypoints": [
+        "src/consumer-main.ts",
+        "src/deployment-workflow-main.ts",
+        "src/publisher-main.ts",
+        "src/workflow-main.ts"
+      ],
+      "bundles": [
+        {
+          "entrypoint": "src/publisher-main.ts",
+          "metafile": "dist/publisher-bundle/metafile.json"
+        },
+        {
+          "entrypoint": "src/consumer-main.ts",
+          "metafile": "dist/consumer-bundle/metafile.json"
+        },
+        {
+          "entrypoint": "src/workflow-main.ts",
+          "metafile": "dist/workflow-bundle/metafile.json"
+        },
+        {
+          "entrypoint": "src/deployment-workflow-main.ts",
+          "metafile": "dist/deployment-workflow-bundle/metafile.json"
+        }
+      ]
+    }
+  },
+  "type": "module",
+  "scripts": {
+    "build": "pnpm types:check && tsc --project tsconfig.build.json && wrangler deploy --dry-run --outdir dist/publisher-bundle --metafile dist/publisher-bundle/metafile.json --config wrangler.publisher.jsonc && wrangler deploy --dry-run --outdir dist/consumer-bundle --metafile dist/consumer-bundle/metafile.json --config wrangler.consumer.jsonc && wrangler deploy --dry-run --outdir dist/workflow-bundle --metafile dist/workflow-bundle/metafile.json --config wrangler.workflow.jsonc && wrangler deploy --dry-run --outdir dist/deployment-workflow-bundle --metafile dist/deployment-workflow-bundle/metafile.json --config wrangler.deployment-workflow.jsonc && node scripts/verify-built-boundary.mjs",
+    "types:generate": "wrangler types --config wrangler.workflow.jsonc worker-configuration.d.ts",
+    "types:check": "wrangler types --check --config wrangler.workflow.jsonc worker-configuration.d.ts",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo",
+    "test": "vitest run --root ../.. apps/project-provisioning-worker",
+    "coverage": "vitest run --root ../.. --coverage --coverage.include=apps/project-provisioning-worker/src/**/*.ts apps/project-provisioning-worker"
+  },
+  "dependencies": {
+    "@ohmyhost/build-broker": "workspace:*",
+    "@ohmyhost/contracts": "workspace:*",
+    "@ohmyhost/database": "workspace:*",
+    "@ohmyhost/orchestrator": "workspace:*",
+    "@ohmyhost/platform": "workspace:*",
+    "@ohmyhost/project-handles": "workspace:*"
+  },
+  "devDependencies": {
+    "wrangler": "4.125.0"
+  }
+}

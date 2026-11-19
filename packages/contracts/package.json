@@ -1,0 +1,221 @@
+{
+  "name": "@ohmyhost/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./signup-attribution": {
+      "source": "./src/signup-attribution.ts",
+      "types": "./dist/signup-attribution.d.ts",
+      "import": "./dist/signup-attribution.js"
+    },
+    "./native-auth": {
+      "source": "./src/native-auth.ts",
+      "types": "./dist/native-auth.d.ts",
+      "import": "./dist/native-auth.js"
+    },
+    "./database-sizes": {
+      "source": "./src/database-sizes.ts",
+      "types": "./dist/database-sizes.d.ts",
+      "import": "./dist/database-sizes.js"
+    },
+    "./shared-mail": {
+      "source": "./src/shared-mail.ts",
+      "types": "./dist/shared-mail.d.ts",
+      "import": "./dist/shared-mail.js"
+    },
+    "./mcp-source-codec": {
+      "source": "./src/mcp-source-codec.ts",
+      "types": "./dist/mcp-source-codec.d.ts",
+      "import": "./dist/mcp-source-codec.js"
+    },
+    "./operation-failure": {
+      "source": "./src/operation-failure.ts",
+      "types": "./dist/operation-failure.d.ts",
+      "import": "./dist/operation-failure.js"
+    },
+    "./billing": {
+      "source": "./src/billing.ts",
+      "types": "./dist/billing.d.ts",
+      "import": "./dist/billing.js"
+    },
+    "./credit-pricing": {
+      "source": "./src/credit-pricing.ts",
+      "types": "./dist/credit-pricing.d.ts",
+      "import": "./dist/credit-pricing.js"
+    },
+    "./egress-origin": {
+      "source": "./src/egress-origin.ts",
+      "types": "./dist/egress-origin.d.ts",
+      "import": "./dist/egress-origin.js"
+    },
+    "./platform-origins": {
+      "source": "./src/platform-origins.ts",
+      "types": "./dist/platform-origins.d.ts",
+      "import": "./dist/platform-origins.js"
+    },
+    "./wfp-dispatch": {
+      "source": "./src/wfp-dispatch.ts",
+      "types": "./dist/wfp-dispatch.d.ts",
+      "import": "./dist/wfp-dispatch.js"
+    },
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./application-root": {
+      "source": "./src/application-root.ts",
+      "types": "./dist/application-root.d.ts",
+      "import": "./dist/application-root.js"
+    },
+    "./database-migration-admission": {
+      "source": "./src/database-migration-admission.ts",
+      "types": "./dist/database-migration-admission.d.ts",
+      "import": "./dist/database-migration-admission.js"
+    },
+    "./framework-family": {
+      "source": "./src/framework-family.ts",
+      "types": "./dist/framework-family.d.ts",
+      "import": "./dist/framework-family.js"
+    },
+    "./operation-deployment-result": {
+      "source": "./src/operation-deployment-result.ts",
+      "types": "./dist/operation-deployment-result.d.ts",
+      "import": "./dist/operation-deployment-result.js"
+    },
+    "./operation-data-change-result": {
+      "source": "./src/operation-data-change-result.ts",
+      "types": "./dist/operation-data-change-result.d.ts",
+      "import": "./dist/operation-data-change-result.js"
+    },
+    "./framework-admission": {
+      "source": "./src/framework-admission.ts",
+      "types": "./dist/framework-admission.d.ts",
+      "import": "./dist/framework-admission.js"
+    },
+    "./framework-build-script": {
+      "source": "./src/framework-build-script.ts",
+      "types": "./dist/framework-build-script.d.ts",
+      "import": "./dist/framework-build-script.js"
+    },
+    "./framework-source-rules": {
+      "source": "./src/framework-source-rules.ts",
+      "types": "./dist/framework-source-rules.d.ts",
+      "import": "./dist/framework-source-rules.js"
+    },
+    "./framework-admission-corpus": {
+      "source": "./src/framework-admission-corpus.ts",
+      "types": "./dist/framework-admission-corpus.d.ts",
+      "import": "./dist/framework-admission-corpus.js"
+    },
+    "./browser-capabilities": {
+      "source": "./src/browser-capabilities.ts",
+      "types": "./dist/browser-capabilities.d.ts",
+      "import": "./dist/browser-capabilities.js"
+    },
+    "./openapi.yaml": "./openapi.yaml",
+    "./ohmyhost.schema.json": "./schemas/ohmyhost.schema.json",
+    "./feedback": {
+      "source": "./src/feedback.ts",
+      "types": "./dist/feedback.d.ts",
+      "import": "./dist/feedback.js"
+    },
+    "./user-api-keys": {
+      "source": "./src/user-api-keys.ts",
+      "types": "./dist/user-api-keys.d.ts",
+      "import": "./dist/user-api-keys.js"
+    },
+    "./project-exports": {
+      "source": "./src/project-exports.ts",
+      "types": "./dist/project-exports.d.ts",
+      "import": "./dist/project-exports.js"
+    },
+    "./project-context": {
+      "source": "./src/project-context.ts",
+      "types": "./dist/project-context.d.ts",
+      "import": "./dist/project-context.js"
+    },
+    "./database-compute": {
+      "source": "./src/database-compute.ts",
+      "types": "./dist/database-compute.d.ts",
+      "import": "./dist/database-compute.js"
+    },
+    "./database-access": {
+      "source": "./src/database-access.ts",
+      "types": "./dist/database-access.d.ts",
+      "import": "./dist/database-access.js"
+    },
+    "./database-events": {
+      "source": "./src/database-events.ts",
+      "types": "./dist/database-events.d.ts",
+      "import": "./dist/database-events.js"
+    },
+    "./database-tables": {
+      "source": "./src/database-tables.ts",
+      "types": "./dist/database-tables.d.ts",
+      "import": "./dist/database-tables.js"
+    },
+    "./functions": {
+      "source": "./src/functions.ts",
+      "types": "./dist/functions.d.ts",
+      "import": "./dist/functions.js"
+    },
+    "./problem-policy": {
+      "source": "./src/problem-policy.ts",
+      "types": "./dist/problem-policy.d.ts",
+      "import": "./dist/problem-policy.js"
+    },
+    "./secret-names": {
+      "source": "./src/secret-names.ts",
+      "types": "./dist/secret-names.d.ts",
+      "import": "./dist/secret-names.js"
+    },
+    "./organization-mcp-connections": {
+      "source": "./src/organization-mcp-connections.ts",
+      "types": "./dist/organization-mcp-connections.d.ts",
+      "import": "./dist/organization-mcp-connections.js"
+    },
+    "./project-data-changes": {
+      "source": "./src/project-data-changes.ts",
+      "types": "./dist/project-data-changes.d.ts",
+      "import": "./dist/project-data-changes.js"
+    },
+    "./managed-sources": {
+      "source": "./src/managed-sources.ts",
+      "types": "./dist/managed-sources.d.ts",
+      "import": "./dist/managed-sources.js"
+    },
+    "./growth-events": {
+      "source": "./src/growth-events.ts",
+      "types": "./dist/growth-events.d.ts",
+      "import": "./dist/growth-events.js"
+    },
+    "./usage-log": {
+      "source": "./src/usage-log.ts",
+      "types": "./dist/usage-log.d.ts",
+      "import": "./dist/usage-log.js"
+    },
+    "./connection-management": {
+      "source": "./src/connection-management.ts",
+      "types": "./dist/connection-management.d.ts",
+      "import": "./dist/connection-management.js"
+    },
+    "./previews": {
+      "source": "./src/previews.ts",
+      "types": "./dist/previews.d.ts",
+      "import": "./dist/previews.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo",
+    "test": "vitest run --root ../.. packages/contracts/test",
+    "validate": "pnpm run typecheck && pnpm run test"
+  },
+  "dependencies": {
+    "ajv": "8.18.0",
+    "yaml": "2.8.3"
+  }
+}

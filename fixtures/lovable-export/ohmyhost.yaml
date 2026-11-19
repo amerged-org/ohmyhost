@@ -1,0 +1,8 @@
+version: 1
+project: lovable-vite-react
+build:
+  install: pnpm install --frozen-lockfile --ignore-scripts
+  command: pnpm run build
+  output: dist
+runtime:
+  mode: static

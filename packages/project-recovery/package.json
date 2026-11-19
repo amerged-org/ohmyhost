@@ -1,0 +1,38 @@
+{
+  "name": "@ohmyhost/project-recovery",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Trusted Node project recovery archives",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./capture": {
+      "source": "./src/capture.ts",
+      "types": "./dist/capture.d.ts",
+      "import": "./dist/capture.js"
+    },
+    "./native-restore-archive": {
+      "source": "./src/native-restore-archive.ts",
+      "types": "./dist/native-restore-archive.d.ts",
+      "import": "./dist/native-restore-archive.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo",
+    "test": "vitest run --root ../.. packages/project-recovery/test"
+  },
+  "dependencies": {
+    "@ohmyhost/contracts": "workspace:*",
+    "@zip.js/zip.js": "2.13.1",
+    "pg": "8.22.0",
+    "@ohmyhost/postgres-bridge": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/pg": "8.20.0"
+  }
+}

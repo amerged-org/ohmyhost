@@ -1,0 +1,101 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-growth-analytics-poc-private-fullstack",
+  "account_id": "00000000000000000000000000000001",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-11-15",
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": {
+    "GROWTH_PLATFORM_ENV": "development",
+    "GROWTH_PUBLIC_ORIGIN": "https://growth-dev.example.test",
+    "GROWTH_ACCESS_ISSUER": "https://odd-cake-1086.cloudflareaccess.com",
+    "GROWTH_ACCESS_AUDIENCE": "0000000000000000000000000000000000000000000000000000000000000014",
+    "GROWTH_QUEUE_NAME": "ohmyho-growth-development",
+    "GROWTH_DLQ_NAME": "ohmyho-growth-development-dlq",
+  },
+  "secrets": {
+    "required": ["GROWTH_OPERATOR_PERMISSIONS_JSON"],
+  },
+  "d1_databases": [
+    {
+      "binding": "GROWTH_DB",
+      "database_name": "ohmyho-growth-development",
+      "database_id": "00000000-0000-4000-8000-000000000015",
+      "migrations_dir": "migrations",
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "GROWTH_USAGE_ARCHIVE",
+      "bucket_name": "ohmyho-growth-development-usage",
+      "jurisdiction": "eu",
+    },
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "GROWTH_QUEUE",
+        "queue": "ohmyho-growth-development",
+      },
+    ],
+    "consumers": [
+      {
+        "queue": "ohmyho-growth-development",
+        "max_batch_size": 20,
+        "max_batch_timeout": 1,
+        "max_retries": 3,
+        "max_concurrency": 3,
+        "dead_letter_queue": "ohmyho-growth-development-dlq",
+      },
+      {
+        "queue": "ohmyho-growth-development-dlq",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 3,
+        "max_concurrency": 1,
+      },
+    ],
+  },
+  "services": [
+    {
+      "binding": "GROWTH_FACTS",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "GrowthFactsRuntime",
+    },
+    {
+      "binding": "GROWTH_IDENTITY",
+      "service": "ohmyhost-workos-management-poc-private-fullstack",
+      "entrypoint": "GrowthIdentityService",
+    },
+    {
+      "binding": "GROWTH_PAYMENTS",
+      "service": "ohmyho-billing-poc-private-fullstack",
+      "entrypoint": "GrowthPaymentService",
+    },
+    {
+      "binding": "GROWTH_RECONCILER",
+      "service": "ohmyho-growth-analytics-poc-private-fullstack",
+      "entrypoint": "GrowthReconcileRuntime",
+    },
+  ],
+  "routes": [
+    {
+      "pattern": "growth-dev.example.test",
+      "custom_domain": true,
+    },
+  ],
+  "triggers": {
+    "crons": ["*/5 * * * *"],
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+  },
+  "version_metadata": {
+    "binding": "CF_VERSION_METADATA",
+  },
+  "limits": {
+    "cpu_ms": 30000,
+  },
+}

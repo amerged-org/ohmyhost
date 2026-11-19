@@ -1,0 +1,57 @@
+{
+  "name": "@ohmyhost/wfp-dispatch",
+  "version": "0.0.0",
+  "private": true,
+  "ohmyhost": {
+    "deployment": "production",
+    "fakeProviderBoundary": {
+      "typescriptProject": "tsconfig.build.json",
+      "artifactRoot": "dist",
+      "entrypoints": [
+        "src/index.ts",
+        "src/gateway-worker-main.ts",
+        "src/shared-gateway-main.ts",
+        "src/outbound-main.ts"
+      ],
+      "bundles": [
+        {
+          "entrypoint": "src/outbound-main.ts",
+          "metafile": "dist/outbound-bundle/metafile.json"
+        },
+        {
+          "entrypoint": "src/shared-gateway-main.ts",
+          "metafile": "dist/shared-gateway-bundle/metafile.json"
+        }
+      ]
+    }
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./browser-security": {
+      "source": "./src/browser-security.ts",
+      "types": "./dist/browser-security.d.ts",
+      "import": "./dist/browser-security.js"
+    }
+  },
+  "dependencies": {
+    "@ohmyhost/contracts": "workspace:*",
+    "@ohmyhost/dev-access-tokens": "workspace:*"
+  },
+  "scripts": {
+    "build": "node scripts/clean-dist.mjs && tsc --project tsconfig.build.json && wrangler deploy --dry-run --outdir dist/outbound-bundle --metafile dist/outbound-bundle/metafile.json --config wrangler.outbound.jsonc && wrangler deploy --dry-run --outdir dist/shared-gateway-bundle --metafile dist/shared-gateway-bundle/metafile.json --config wrangler.shared.jsonc",
+    "coverage": "vitest run --root ../.. apps/wfp-dispatch/test --coverage --coverage.include='apps/wfp-dispatch/src/**/*.ts' --coverage.reporter=text --coverage.reporter=json-summary",
+    "deploy:dry-run": "wrangler deploy --dry-run --outdir .wrangler/dry-run",
+    "deploy:outbound:dry-run": "wrangler deploy --dry-run --outdir .wrangler/outbound-dry-run --config wrangler.outbound.jsonc",
+    "deploy:shared:dry-run": "wrangler deploy --dry-run --outdir .wrangler/shared-dry-run --config wrangler.shared.jsonc",
+    "test": "vitest run --root ../.. apps/wfp-dispatch/test",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo"
+  },
+  "devDependencies": {
+    "wrangler": "4.124.0"
+  }
+}

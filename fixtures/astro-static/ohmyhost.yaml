@@ -1,0 +1,14 @@
+version: 1
+project: astro-static-acceptance
+build:
+  install: npm ci --ignore-scripts
+  command: npm run build
+  output: dist
+runtime:
+  mode: static
+database:
+  enabled: false
+auth:
+  provider: none
+mail:
+  enabled: false

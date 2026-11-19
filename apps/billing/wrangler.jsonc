@@ -1,0 +1,33 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-billing-poc-private-fullstack",
+  "account_id": "00000000000000000000000000000001",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-09-07",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": {
+    "STRIPE_ACCOUNT_ID": "acct_00000W39Example2",
+    "STRIPE_MODE": "test",
+    "STRIPE_PAID_PRICE_ID": "price_0000000000000W39Example3",
+    "STRIPE_TOPUP_PRICE_ID": "price_0000000000000W39Example4",
+    "STRIPE_PORTAL_CONFIGURATION_ID": "bpc_0000000000000W39Example5",
+    "BILLING_RETURN_ORIGIN": "https://dev.app.ohmyho.st",
+  },
+  // The existing Control API scheduler invokes the private inbox batch through BILLING.
+  "triggers": { "crons": [] },
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "services": [
+    {
+      "binding": "GROWTH_STRIPE_CUSTOMER_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "GrowthStripeCustomerRuntime",
+    },
+    {
+      "binding": "CONTROL_RUNTIME",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "BillingRuntime",
+    },
+  ],
+}

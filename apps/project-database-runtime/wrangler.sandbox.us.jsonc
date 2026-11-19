@@ -1,0 +1,33 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-project-database-sandbox-us",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-08-24",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": {
+    "DATABASE_REGION": "us",
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "DATABASE_ENVIRONMENTS",
+        "class_name": "ProjectDatabaseEnvironment",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["ProjectDatabaseEnvironment"],
+    },
+  ],
+  "services": [
+    {
+      "binding": "OHMYHOST_MAIL_GATEWAY",
+      "entrypoint": "DatabaseMailEntrypoint",
+      "service": "ohmyho-mail-gateway-sandbox",
+    },
+  ],
+}

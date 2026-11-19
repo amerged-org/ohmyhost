@@ -1,0 +1,632 @@
+{
+  "version": 1,
+  "review": "reviewed",
+  "diagram": {
+    "id": "credit-usage-pass",
+    "title": "Credit Service — hourly usage pass",
+    "family": "process",
+    "syntax": "flowchart",
+    "provenance": "curated",
+    "context": "implemented",
+    "nodes": [
+      {
+        "id": "cron",
+        "label": "Cron at minutes 27 and 57 of every hour",
+        "evidence": [
+          {
+            "line": 15,
+            "path": "apps/credit-service/wrangler.production.jsonc",
+            "sha256": "981a9ba729879f3a514698a056d38b0d62a153cfa8512bb0edeb0c25acafea23"
+          },
+          {
+            "line": 28,
+            "path": "apps/credit-service/src/worker-main.ts",
+            "sha256": "fa67712d6401a1050507da7f8040f8b93ae67d233fe769450ecf447d25ad6ff9",
+            "symbol": "USAGE_CRON"
+          }
+        ]
+      },
+      {
+        "id": "pass",
+        "label": "Run the four sources in turn; one failing source does not stop the others",
+        "evidence": [
+          {
+            "line": 135,
+            "path": "apps/credit-service/src/worker-main.ts",
+            "sha256": "a920554e98733eeafa9488f05a530606c400d008d78c9e82c8062af7bcf5f796",
+            "symbol": "runUsage"
+          },
+          {
+            "line": 123,
+            "path": "apps/credit-service/src/worker-main.ts",
+            "sha256": "f85088f64aa5f266d5128aa4eb00f1ab66f6bf039734202bc3ed43e22a7b29aa",
+            "symbol": "SOURCES"
+          }
+        ]
+      },
+      {
+        "id": "skipped",
+        "label": "Source skipped: the Core has no cursor row for it",
+        "evidence": [
+          {
+            "line": 22,
+            "path": "apps/credit-service/src/wfp.ts",
+            "sha256": "f39937dae295df65cc376e4e1dbc8fb8d55d2c188e4a74ccac5e36d4fb51d051",
+            "symbol": "runWfp"
+          },
+          {
+            "line": 71,
+            "path": "apps/credit-service/src/pgcf.ts",
+            "sha256": "cbddef05dcda5bd5df8dbbbc4d93c7b46ca6347de9cc634ee860500cd2d21909",
+            "symbol": "runPgcf"
+          },
+          {
+            "line": 12,
+            "path": "apps/credit-service/src/daily.ts",
+            "sha256": "525054983253fcaca956510442df4e9dd99f716f0922e3246a83a8206e65cb70",
+            "symbol": "runDays"
+          }
+        ]
+      },
+      {
+        "id": "wfp",
+        "label": "wfp: Logpush objects of each finished hour (at most 12 a pass): billable requests and CPU time per script owner",
+        "evidence": [
+          {
+            "line": 22,
+            "path": "apps/credit-service/src/wfp.ts",
+            "sha256": "f39937dae295df65cc376e4e1dbc8fb8d55d2c188e4a74ccac5e36d4fb51d051",
+            "symbol": "runWfp"
+          },
+          {
+            "line": 42,
+            "path": "apps/credit-service/src/wfp.ts",
+            "sha256": "bae46109a525f06f21d001b1c70201d246024c381d3801a95d62a5f7083388ee",
+            "symbol": "billWindow"
+          },
+          {
+            "line": 76,
+            "path": "apps/credit-service/src/logpush.ts",
+            "sha256": "019c1422313d452bab0aac3275f5cac0b8815ace9871665b508e5d2a0381f81f",
+            "symbol": "listWindowObjects"
+          },
+          {
+            "line": 116,
+            "path": "apps/credit-service/src/logpush.ts",
+            "sha256": "c1d888529674add617c30c90d6bcab44c63cdf701aeda9dc8a9330bf8126e904",
+            "symbol": "readUsageObject"
+          }
+        ]
+      },
+      {
+        "id": "pgcf",
+        "label": "pgcf: final hourly memory rollups (hours ended 2 h ago or earlier, at most 24 a pass): application and independent Native project database owners; afterwards disable schedules of the projects whose Stop budget is reached or whose organization is credit-denied (no balance past the grace, or at the overrun ceiling), at most 50 of each a pass",
+        "evidence": [
+          {
+            "line": 71,
+            "path": "apps/credit-service/src/pgcf.ts",
+            "sha256": "cbddef05dcda5bd5df8dbbbc4d93c7b46ca6347de9cc634ee860500cd2d21909",
+            "symbol": "runPgcf"
+          },
+          {
+            "line": 207,
+            "path": "apps/credit-service/src/pgcf.ts",
+            "sha256": "beff4cc567cdf826f4a8beb5cf86d46d6fa91ab148492a202c92cb4628d66f28",
+            "symbol": "billHour"
+          },
+          {
+            "line": 143,
+            "path": "apps/credit-service/src/pgcf.ts",
+            "sha256": "d99ad7ff26a563e9591d0d962b2d3967dc76435e6147779fa748b20eb12d979d",
+            "symbol": "stopReachedBudgets"
+          }
+        ]
+      },
+      {
+        "id": "r2",
+        "label": "r2: finished days (at most 3 a pass): billed buckets from the Core, storage peak and operations from the R2 usage collector",
+        "evidence": [
+          {
+            "line": 91,
+            "path": "apps/credit-service/src/r2.ts",
+            "sha256": "8ae442120f0ea7972914c8d7950b1de9f5df7d2a499ba36a3b2fb7c035351cc4",
+            "symbol": "runR2"
+          },
+          {
+            "line": 48,
+            "path": "apps/credit-service/src/r2.ts",
+            "sha256": "cbb883849c2931379be6e35a63aa1b1080b36c668b13dff4cfdf1406acb3a00a",
+            "symbol": "billDay"
+          },
+          {
+            "line": 12,
+            "path": "apps/credit-service/src/daily.ts",
+            "sha256": "525054983253fcaca956510442df4e9dd99f716f0922e3246a83a8206e65cb70",
+            "symbol": "runDays"
+          }
+        ]
+      },
+      {
+        "id": "resources",
+        "label": "resources: finished days (at most 3 a pass): active WFP scripts and custom hostnames from the Core",
+        "evidence": [
+          {
+            "line": 50,
+            "path": "apps/credit-service/src/resources.ts",
+            "sha256": "dcf8b2f1c198851168317939ba103edd41834a7d704c29a5cd423a6bb77327b6",
+            "symbol": "runResources"
+          },
+          {
+            "line": 13,
+            "path": "apps/credit-service/src/resources.ts",
+            "sha256": "ce2507ede9d8671cd187d79617280c88d565c7e69d9ef905a1427d8d79ddf5f5",
+            "symbol": "billDay"
+          },
+          {
+            "line": 12,
+            "path": "apps/credit-service/src/daily.ts",
+            "sha256": "525054983253fcaca956510442df4e9dd99f716f0922e3246a83a8206e65cb70",
+            "symbol": "runDays"
+          }
+        ]
+      },
+      {
+        "id": "price",
+        "label": "Price the lines with current rate cards; Native keeps project resource kind and no logical environment; unpriced meters are counted, not billed",
+        "evidence": [
+          {
+            "line": 106,
+            "path": "apps/credit-service/src/pricing.ts",
+            "sha256": "6287c8ce55b7336913b6c41d9692f2ac60737337c9ca11e77a8779164cb3b738",
+            "symbol": "organizationLines"
+          },
+          {
+            "line": 43,
+            "path": "apps/credit-service/src/pricing.ts",
+            "sha256": "3bdfff424e41a5e5cd5f279378baa02841e32b9fe6922ac43d9d7bc62165c107",
+            "symbol": "ratesToCards"
+          }
+        ]
+      },
+      {
+        "id": "post",
+        "label": "Post per organization and window under an idempotent key; a window above 2,000 lines is split into hash parts of at most 1,000 lines and the Core books a window in one layout only; the Core charges the credit account",
+        "evidence": [
+          {
+            "line": 162,
+            "path": "apps/credit-service/src/source.ts",
+            "sha256": "d57d738e95894b83198e612d684f8da7f22f6b63bf6c253b6c943af18e4f4751",
+            "symbol": "postOrganizations"
+          }
+        ]
+      },
+      {
+        "id": "advance",
+        "label": "Advance the source cursor; a failed window is repeated by the next pass",
+        "evidence": [
+          {
+            "line": 42,
+            "path": "apps/credit-service/src/wfp.ts",
+            "sha256": "bae46109a525f06f21d001b1c70201d246024c381d3801a95d62a5f7083388ee",
+            "symbol": "billWindow"
+          },
+          {
+            "line": 12,
+            "path": "apps/credit-service/src/daily.ts",
+            "sha256": "525054983253fcaca956510442df4e9dd99f716f0922e3246a83a8206e65cb70",
+            "symbol": "runDays"
+          },
+          {
+            "line": 71,
+            "path": "apps/credit-service/src/pgcf.ts",
+            "sha256": "cbddef05dcda5bd5df8dbbbc4d93c7b46ca6347de9cc634ee860500cd2d21909",
+            "symbol": "runPgcf"
+          }
+        ]
+      },
+      {
+        "id": "rotate",
+        "label": "Attempt the credit-log rotation; it waits until every cursor has passed 00:00 UTC",
+        "evidence": [
+          {
+            "line": 135,
+            "path": "apps/credit-service/src/worker-main.ts",
+            "sha256": "a920554e98733eeafa9488f05a530606c400d008d78c9e82c8062af7bcf5f796",
+            "symbol": "runUsage"
+          },
+          {
+            "line": 206,
+            "path": "apps/credit-service/src/rotation.ts",
+            "sha256": "03c6e171b0b0a6e8dd08cbe02cbc3c0c97f531cbe2950b3dc572e034d4cb7450",
+            "symbol": "rotateCreditLog"
+          }
+        ]
+      },
+      {
+        "id": "failed",
+        "label": "The invocation fails and names the incomplete sources, the replay or the rotation",
+        "evidence": [
+          {
+            "line": 135,
+            "path": "apps/credit-service/src/worker-main.ts",
+            "sha256": "a920554e98733eeafa9488f05a530606c400d008d78c9e82c8062af7bcf5f796",
+            "symbol": "runUsage"
+          }
+        ]
+      },
+      {
+        "id": "pgcf-hold",
+        "label": "Hold the PGCF cursor before unresolved Native creates or billable provider hours that are not final; retain earlier finalized hours",
+        "evidence": [
+          {
+            "path": "apps/credit-service/src/pgcf.ts",
+            "symbol": "billFinalHours",
+            "line": 85,
+            "sha256": "62a57ded2cc4e233e98fa5f922ac3beedb91c0bc7f073d43c92656212c2604ec"
+          },
+          {
+            "path": "apps/credit-service/src/pgcf.ts",
+            "symbol": "firstHeldHour",
+            "line": 175,
+            "sha256": "2200b058127c51f49e82aca648f553097f9d24475bae2a6c73a592cafecdaf7b"
+          }
+        ]
+      },
+      {
+        "id": "deadletter",
+        "label": "A posting that fails is recorded in the Core: a rejected line, or a posting of an organization that already has a dead posting for the source, is dead at once; any other fault is dead after four passes; the cursor then advances and the window is no longer held",
+        "evidence": [
+          {
+            "line": 162,
+            "path": "apps/credit-service/src/source.ts",
+            "sha256": "d57d738e95894b83198e612d684f8da7f22f6b63bf6c253b6c943af18e4f4751",
+            "symbol": "postOrganizations"
+          },
+          {
+            "line": 186,
+            "sha256": "844b12ac4786f407074de842adb590a375e085439e8f7258a552f643e572ab15",
+            "symbol": "createCreditCommands",
+            "path": "apps/control-store/src/catalog/credit/runtime.ts"
+          }
+        ]
+      },
+      {
+        "id": "replay",
+        "label": "Replay the postings that failed for good, oldest failure first, with backoff from 30 minutes doubling to a day; each is filed at the Core's clock; the invocation fails while one is still open",
+        "evidence": [
+          {
+            "line": 135,
+            "path": "apps/credit-service/src/worker-main.ts",
+            "sha256": "a920554e98733eeafa9488f05a530606c400d008d78c9e82c8062af7bcf5f796",
+            "symbol": "runUsage"
+          },
+          {
+            "line": 186,
+            "sha256": "844b12ac4786f407074de842adb590a375e085439e8f7258a552f643e572ab15",
+            "symbol": "createCreditCommands",
+            "path": "apps/control-store/src/catalog/credit/runtime.ts"
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "id": "cron-pass",
+        "from": "cron",
+        "to": "pass",
+        "label": "Usage cron",
+        "evidence": [
+          {
+            "line": 28,
+            "path": "apps/credit-service/src/worker-main.ts",
+            "sha256": "fa67712d6401a1050507da7f8040f8b93ae67d233fe769450ecf447d25ad6ff9",
+            "symbol": "USAGE_CRON"
+          },
+          {
+            "line": 135,
+            "path": "apps/credit-service/src/worker-main.ts",
+            "sha256": "a920554e98733eeafa9488f05a530606c400d008d78c9e82c8062af7bcf5f796",
+            "symbol": "runUsage"
+          }
+        ]
+      },
+      {
+        "id": "pass-wfp",
+        "from": "pass",
+        "to": "wfp",
+        "label": "Source 1 of 4",
+        "evidence": [
+          {
+            "line": 123,
+            "path": "apps/credit-service/src/worker-main.ts",
+            "sha256": "f85088f64aa5f266d5128aa4eb00f1ab66f6bf039734202bc3ed43e22a7b29aa",
+            "symbol": "SOURCES"
+          }
+        ]
+      },
+      {
+        "id": "pass-pgcf",
+        "from": "pass",
+        "to": "pgcf",
+        "label": "Source 2 of 4",
+        "evidence": [
+          {
+            "line": 123,
+            "path": "apps/credit-service/src/worker-main.ts",
+            "sha256": "f85088f64aa5f266d5128aa4eb00f1ab66f6bf039734202bc3ed43e22a7b29aa",
+            "symbol": "SOURCES"
+          }
+        ]
+      },
+      {
+        "id": "pass-r2",
+        "from": "pass",
+        "to": "r2",
+        "label": "Source 3 of 4",
+        "evidence": [
+          {
+            "line": 123,
+            "path": "apps/credit-service/src/worker-main.ts",
+            "sha256": "f85088f64aa5f266d5128aa4eb00f1ab66f6bf039734202bc3ed43e22a7b29aa",
+            "symbol": "SOURCES"
+          }
+        ]
+      },
+      {
+        "id": "pass-resources",
+        "from": "pass",
+        "to": "resources",
+        "label": "Source 4 of 4",
+        "evidence": [
+          {
+            "line": 123,
+            "path": "apps/credit-service/src/worker-main.ts",
+            "sha256": "f85088f64aa5f266d5128aa4eb00f1ab66f6bf039734202bc3ed43e22a7b29aa",
+            "symbol": "SOURCES"
+          }
+        ]
+      },
+      {
+        "id": "pass-skipped",
+        "from": "pass",
+        "to": "skipped",
+        "label": "No cursor for the source",
+        "evidence": [
+          {
+            "line": 22,
+            "path": "apps/credit-service/src/wfp.ts",
+            "sha256": "f39937dae295df65cc376e4e1dbc8fb8d55d2c188e4a74ccac5e36d4fb51d051",
+            "symbol": "runWfp"
+          },
+          {
+            "line": 71,
+            "path": "apps/credit-service/src/pgcf.ts",
+            "sha256": "cbddef05dcda5bd5df8dbbbc4d93c7b46ca6347de9cc634ee860500cd2d21909",
+            "symbol": "runPgcf"
+          },
+          {
+            "line": 12,
+            "path": "apps/credit-service/src/daily.ts",
+            "sha256": "525054983253fcaca956510442df4e9dd99f716f0922e3246a83a8206e65cb70",
+            "symbol": "runDays"
+          }
+        ]
+      },
+      {
+        "id": "wfp-price",
+        "from": "wfp",
+        "to": "price",
+        "label": "Lines per script owner",
+        "evidence": [
+          {
+            "line": 42,
+            "path": "apps/credit-service/src/wfp.ts",
+            "sha256": "bae46109a525f06f21d001b1c70201d246024c381d3801a95d62a5f7083388ee",
+            "symbol": "billWindow"
+          }
+        ]
+      },
+      {
+        "id": "pgcf-price",
+        "from": "pgcf",
+        "to": "price",
+        "label": "Lines per database owner",
+        "evidence": [
+          {
+            "line": 207,
+            "path": "apps/credit-service/src/pgcf.ts",
+            "sha256": "beff4cc567cdf826f4a8beb5cf86d46d6fa91ab148492a202c92cb4628d66f28",
+            "symbol": "billHour"
+          }
+        ]
+      },
+      {
+        "id": "r2-price",
+        "from": "r2",
+        "to": "price",
+        "label": "Lines per bucket owner",
+        "evidence": [
+          {
+            "line": 48,
+            "path": "apps/credit-service/src/r2.ts",
+            "sha256": "cbb883849c2931379be6e35a63aa1b1080b36c668b13dff4cfdf1406acb3a00a",
+            "symbol": "billDay"
+          }
+        ]
+      },
+      {
+        "id": "resources-price",
+        "from": "resources",
+        "to": "price",
+        "label": "Lines per environment",
+        "evidence": [
+          {
+            "line": 13,
+            "path": "apps/credit-service/src/resources.ts",
+            "sha256": "ce2507ede9d8671cd187d79617280c88d565c7e69d9ef905a1427d8d79ddf5f5",
+            "symbol": "billDay"
+          }
+        ]
+      },
+      {
+        "id": "price-post",
+        "from": "price",
+        "to": "post",
+        "label": "Grouped by organization",
+        "evidence": [
+          {
+            "line": 106,
+            "path": "apps/credit-service/src/pricing.ts",
+            "sha256": "6287c8ce55b7336913b6c41d9692f2ac60737337c9ca11e77a8779164cb3b738",
+            "symbol": "organizationLines"
+          }
+        ]
+      },
+      {
+        "id": "post-advance",
+        "from": "post",
+        "to": "advance",
+        "label": "Every organization posted",
+        "evidence": [
+          {
+            "line": 42,
+            "path": "apps/credit-service/src/wfp.ts",
+            "sha256": "bae46109a525f06f21d001b1c70201d246024c381d3801a95d62a5f7083388ee",
+            "symbol": "billWindow"
+          },
+          {
+            "line": 12,
+            "path": "apps/credit-service/src/daily.ts",
+            "sha256": "525054983253fcaca956510442df4e9dd99f716f0922e3246a83a8206e65cb70",
+            "symbol": "runDays"
+          },
+          {
+            "line": 71,
+            "path": "apps/credit-service/src/pgcf.ts",
+            "sha256": "cbddef05dcda5bd5df8dbbbc4d93c7b46ca6347de9cc634ee860500cd2d21909",
+            "symbol": "runPgcf"
+          }
+        ]
+      },
+      {
+        "id": "pass-failed",
+        "from": "pass",
+        "to": "failed",
+        "label": "Any source, the replay or the rotation failed",
+        "evidence": [
+          {
+            "line": 135,
+            "path": "apps/credit-service/src/worker-main.ts",
+            "sha256": "a920554e98733eeafa9488f05a530606c400d008d78c9e82c8062af7bcf5f796",
+            "symbol": "runUsage"
+          }
+        ]
+      },
+      {
+        "id": "pgcf-hold",
+        "from": "pgcf",
+        "to": "pgcf-hold",
+        "label": "Unknown resource identity or non-final billed hour",
+        "evidence": [
+          {
+            "path": "apps/credit-service/src/pgcf.ts",
+            "symbol": "billFinalHours",
+            "line": 85,
+            "sha256": "62a57ded2cc4e233e98fa5f922ac3beedb91c0bc7f073d43c92656212c2604ec"
+          },
+          {
+            "path": "apps/credit-service/src/pgcf.ts",
+            "symbol": "firstHeldHour",
+            "line": 175,
+            "sha256": "2200b058127c51f49e82aca648f553097f9d24475bae2a6c73a592cafecdaf7b"
+          }
+        ]
+      },
+      {
+        "id": "post-deadletter",
+        "from": "post",
+        "to": "deadletter",
+        "label": "A posting fails",
+        "evidence": [
+          {
+            "line": 162,
+            "path": "apps/credit-service/src/source.ts",
+            "sha256": "d57d738e95894b83198e612d684f8da7f22f6b63bf6c253b6c943af18e4f4751",
+            "symbol": "postOrganizations"
+          }
+        ]
+      },
+      {
+        "id": "deadletter-advance",
+        "from": "deadletter",
+        "to": "advance",
+        "label": "Dead-lettered: the window no longer holds the cursor",
+        "evidence": [
+          {
+            "line": 162,
+            "path": "apps/credit-service/src/source.ts",
+            "sha256": "d57d738e95894b83198e612d684f8da7f22f6b63bf6c253b6c943af18e4f4751",
+            "symbol": "postOrganizations"
+          }
+        ]
+      },
+      {
+        "id": "pass-replay",
+        "from": "pass",
+        "to": "replay",
+        "label": "After the four sources",
+        "evidence": [
+          {
+            "line": 135,
+            "path": "apps/credit-service/src/worker-main.ts",
+            "sha256": "a920554e98733eeafa9488f05a530606c400d008d78c9e82c8062af7bcf5f796",
+            "symbol": "runUsage"
+          }
+        ]
+      },
+      {
+        "id": "deadletter-replay",
+        "from": "deadletter",
+        "to": "replay",
+        "label": "Retried later",
+        "evidence": [
+          {
+            "line": 135,
+            "path": "apps/credit-service/src/worker-main.ts",
+            "sha256": "a920554e98733eeafa9488f05a530606c400d008d78c9e82c8062af7bcf5f796",
+            "symbol": "runUsage"
+          }
+        ]
+      },
+      {
+        "id": "replay-rotate",
+        "from": "replay",
+        "to": "rotate",
+        "label": "Then the rotation attempt",
+        "evidence": [
+          {
+            "line": 135,
+            "path": "apps/credit-service/src/worker-main.ts",
+            "sha256": "a920554e98733eeafa9488f05a530606c400d008d78c9e82c8062af7bcf5f796",
+            "symbol": "runUsage"
+          }
+        ]
+      },
+      {
+        "id": "replay-failed",
+        "from": "replay",
+        "to": "failed",
+        "label": "A dead letter is still open",
+        "evidence": [
+          {
+            "line": 135,
+            "path": "apps/credit-service/src/worker-main.ts",
+            "sha256": "a920554e98733eeafa9488f05a530606c400d008d78c9e82c8062af7bcf5f796",
+            "symbol": "runUsage"
+          }
+        ]
+      }
+    ],
+    "direction": "LR"
+  }
+}

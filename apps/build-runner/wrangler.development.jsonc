@@ -1,0 +1,78 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-build-runner-poc-private-fullstack",
+  "account_id": "00000000000000000000000000000001",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-08-19",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "persist": true,
+      "invocation_logs": true,
+    },
+  },
+  "vars": {
+    "BUILD_OBJECTS_BUCKET_US": "ohmyho-builds-development",
+    "BUILD_OBJECTS_BUCKET_EU": "ohmyho-builds-development-eu",
+    "BUILD_PROJECT": "ohmyho-poc-private-fullstack-build",
+  },
+  "r2_buckets": [
+    {
+      "binding": "BUILD_OBJECTS_US",
+      "bucket_name": "ohmyho-builds-development",
+      "jurisdiction": "us",
+    },
+    {
+      "binding": "BUILD_OBJECTS_EU",
+      "bucket_name": "ohmyho-builds-development-eu",
+      "jurisdiction": "eu",
+    },
+  ],
+  "services": [
+    {
+      "binding": "BUILD_RECEIPTS",
+      "service": "ohmyho-control-api-poc-private-fullstack",
+      "entrypoint": "BuildReceiptPersistenceService",
+    },
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "BUILD_SANDBOX", "class_name": "BuildSandbox" },
+      { "name": "BUILD_SANDBOX_EU", "class_name": "BuildSandboxEu" },
+    ],
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["BuildSandbox"] },
+    { "tag": "v2", "new_sqlite_classes": ["BuildSandboxEu"] },
+  ],
+  "containers": [
+    {
+      "name": "ohmyho-build-sandbox-poc-private-fullstack",
+      "class_name": "BuildSandbox",
+      "image": "./sandbox/Dockerfile",
+      "image_build_context": "../..",
+      "instance_type": "standard-3",
+      "max_instances": 10,
+      "constraints": { "regions": ["ENAM", "WNAM"] },
+      // A rollout waits this long for a sandbox that is still building (5 + 8 minutes at most).
+      "rollout_active_grace_period": 900,
+    },
+    {
+      // The same image for EU projects; the jurisdiction keeps the sandbox inside the EU.
+      "name": "ohmyho-build-sandbox-poc-private-fullstack-eu",
+      "class_name": "BuildSandboxEu",
+      "image": "./sandbox/Dockerfile",
+      "image_build_context": "../..",
+      "instance_type": "standard-3",
+      "max_instances": 10,
+      "constraints": { "jurisdiction": "eu" },
+      "rollout_active_grace_period": 900,
+    },
+  ],
+}

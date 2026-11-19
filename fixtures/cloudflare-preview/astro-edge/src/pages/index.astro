@@ -1,0 +1,11 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"/><title>Preview notes</title></head><body><main><h1>Preview notes</h1><label>Id<input id="note-id"/></label><label>Body<input id="note-body"/></label><button id="note-save">Save</button><button id="note-read">Read</button><button id="note-delete">Delete</button><output id="note-result"></output></main><script>
+const id = document.querySelector<HTMLInputElement>('#note-id')!;
+const body = document.querySelector<HTMLInputElement>('#note-body')!;
+const result = document.querySelector<HTMLOutputElement>('#note-result')!;
+for (const [name, method] of [['save', 'POST'], ['read', 'GET'], ['delete', 'DELETE']] as const) {
+  document.querySelector(`#note-${name}`)!.addEventListener('click', async () => {
+    const response = await fetch('/api/notes', method === 'GET' ? { cache: 'no-store' } : { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: id.value, body: body.value }) });
+    result.textContent = response.ok ? JSON.stringify(await response.json()) : `HTTP ${response.status}`;
+  });
+}
+</script></body></html>

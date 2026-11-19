@@ -1,0 +1,13 @@
+{
+  "name": "ohmyhost-fixture-vite-npm-5",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "npm@11.5.1",
+  "scripts": {
+    "build": "vite build"
+  },
+  "devDependencies": {
+    "vite": "5.4.21"
+  }
+}

@@ -1,0 +1,38 @@
+flowchart TD
+    n_200c7e622003["Activate gateway; recheck<br/>authorization and Native launch;<br/>finalize"]
+    n_44575cf5b285["Start isolated build and poll<br/>artifact"]
+    n_dda18a0e21ae["Stage immutable candidate and<br/>persist receipt"]
+    n_f7a02876a32b["Clean up or compensate candidate"]
+    n_3549b0028b75["Ensure resources; optional Native<br/>admission; bounded mail and database<br/>waits"]
+    n_5d28a90f4498["Known failure persisted"]
+    n_87346eb28235["Authorize candidate and target<br/>Native launch policy"]
+    n_e2c30d592648["Persist uncertain provider outcome<br/>for reconciliation"]
+    n_d6cc0a088c07["Read refresh with current provider<br/>target"]
+    n_1f58b9145b24["DeploymentRequestedV1 after pending<br/>cleanup"]
+    n_41cf6794ba42["Fetch exact source archive"]
+    n_aee408847d35["Confirmed deployment completion"]
+    n_444bd9c51d51["Superseded candidate terminalized"]
+    n_200c7e622003 -->|"Absent, unhealthy or superseded"| n_f7a02876a32b
+    n_200c7e622003 -->|"Uncertain activation or secret<br/>receipt, or finalization conflict"| n_e2c30d592648
+    n_200c7e622003 -->|"Healthy and finalization confirmed"| n_aee408847d35
+    n_44575cf5b285 -->|"Artifact observed and digest present"| n_3549b0028b75
+    n_44575cf5b285 -->|"Known build failure"| n_5d28a90f4498
+    n_44575cf5b285 -->|"No usable artifact after bounded<br/>polling"| n_e2c30d592648
+    n_dda18a0e21ae -->|"Provider rejected script"| n_5d28a90f4498
+    n_dda18a0e21ae -->|"Candidate persisted and secret stage<br/>recorded"| n_87346eb28235
+    n_dda18a0e21ae -->|"Stage outcome uncertain"| n_e2c30d592648
+    n_f7a02876a32b -->|"Unhealthy deployment compensated"| n_5d28a90f4498
+    n_f7a02876a32b -->|"Cleanup uncertain or no current<br/>outcome"| n_e2c30d592648
+    n_f7a02876a32b -->|"Cleanup observed and superseding<br/>operation known"| n_444bd9c51d51
+    n_3549b0028b75 -->|"Resources ready"| n_dda18a0e21ae
+    n_3549b0028b75 -->|"Known resource or migration failure"| n_5d28a90f4498
+    n_3549b0028b75 -->|"Not ready after bounded wait"| n_e2c30d592648
+    n_87346eb28235 -->|"Authorization and optional Native<br/>admission allow candidate"| n_200c7e622003
+    n_87346eb28235 -->|"Superseded before activation"| n_f7a02876a32b
+    n_d6cc0a088c07 -->|"Reusable artifact and matching<br/>current database target"| n_dda18a0e21ae
+    n_d6cc0a088c07 -->|"Published refresh cannot be<br/>finalized"| n_e2c30d592648
+    n_d6cc0a088c07 -->|"No private binding refresh"| n_41cf6794ba42
+    n_d6cc0a088c07 -->|"Already completed, or published<br/>refresh finalized"| n_aee408847d35
+    n_1f58b9145b24 -->|"Deployment request"| n_d6cc0a088c07
+    n_41cf6794ba42 -->|"Archive observed"| n_44575cf5b285
+    n_41cf6794ba42 -->|"Archive uncertain"| n_e2c30d592648

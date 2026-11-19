@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "include": [
+    "apps/**/wrangler*.jsonc",
+    "apps/orchestrator/src/deployment-workflow.ts",
+    ".github/workflows/*.yml",
+    ".github/workflows/*.yaml",
+    "packages/database/src/deployment-binding-refresh.ts",
+    "apps/control-store/src/catalog/provisioning/binding-refresh-proof.ts",
+    "apps/control-store/src/catalog/credit/**",
+    "apps/control-store/migrations/core/**",
+    "apps/credit-service/src/**",
+    "apps/control-api/src/d1-credits.ts",
+    "apps/control-store/src/catalog/identity/native-auth-*.ts",
+    "apps/control-store/src/catalog/provisioning/deployment-authorization.ts",
+    "apps/control-store/src/catalog/provisioning/deployment-finalization.ts",
+    "skills/ohmyhost-deploy/SKILL.md",
+    "apps/wfp-dispatch/src/outbound*.ts"
+  ],
+  "exclude": [],
+  "outputDir": "docs/architecture/mermaider",
+  "audience": "technical",
+  "detail": "both",
+  "diagrams": [
+    {
+      "id": "architecture_f188c0fbbed3",
+      "title": "Production deployment worker \u2014 declared resource topology",
+      "output": {
+        "markdown": "docs/architecture/mermaider/deployment-resources.md",
+        "mermaid": "docs/architecture/mermaider/deployment-resources.mmd"
+      },
+      "navLabel": "Deploy resources"
+    },
+    {
+      "id": "customer-deployment",
+      "model": ".mermaider/models/customer-deployment.json",
+      "navLabel": "Deploy outcomes"
+    },
+    {
+      "id": "customer-deployment-sequence",
+      "model": ".mermaider/models/customer-deployment-sequence.json",
+      "navLabel": "Deploy sequence"
+    },
+    {
+      "id": "architecture_d463264591f1",
+      "title": "Credit Service \u2014 declared resource topology",
+      "navLabel": "Credit service",
+      "output": {
+        "markdown": "docs/architecture/mermaider/credit-service-resources.md",
+        "mermaid": "docs/architecture/mermaider/credit-service-resources.mmd"
+      }
+    },
+    {
+      "id": "credit-usage-pass",
+      "model": ".mermaider/models/credit-usage-pass.json",
+      "navLabel": "Usage pass"
+    },
+    {
+      "id": "credit-charge",
+      "model": ".mermaider/models/credit-charge.json",
+      "navLabel": "Credit charge"
+    },
+    {
+      "id": "credit-log-rotation",
+      "model": ".mermaider/models/credit-log-rotation.json",
+      "navLabel": "Credit log"
+    },
+    {
+      "id": "data:schema:apps/control-store/migrations",
+      "title": "Core credit account tables (selected view of the replayed migrations)",
+      "navLabel": "Credit tables",
+      "focus": [
+        "credit_account",
+        "project_credit",
+        "credit_reservation",
+        "credit_grant",
+        "usage_cursor",
+        "credit_log"
+      ],
+      "attributes": "all",
+      "output": {
+        "markdown": "docs/architecture/mermaider/credit-tables.md",
+        "mermaid": "docs/architecture/mermaider/credit-tables.mmd"
+      }
+    }
+  ],
+  "hooks": {
+    "enabled": true,
+    "trigger": "commit"
+  }
+}

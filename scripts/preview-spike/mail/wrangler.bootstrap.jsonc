@@ -1,0 +1,42 @@
+{
+  // First deployment only. The missing spike authority makes every send fail closed.
+  // Deploy the final wrangler.jsonc after the spike Worker exists.
+  "name": "ohmyho-preview-spike-mail-development",
+  "account_id": "00000000000000000000000000000001",
+  "main": "./worker.mjs",
+  "compatibility_date": "2026-11-11",
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": false },
+  "services": [
+    {
+      "binding": "QA_MAIL_KEY_CUSTODY",
+      "service": "ohmyho-runtime-secret-delivery-poc-private-fullstack",
+      "entrypoint": "QaPreviewMailKey",
+    },
+    {
+      "binding": "QA_DEV_ACCESS",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "DevAccessRuntime",
+    },
+    {
+      "binding": "QA_CREDIT",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "GatewayCreditRuntime",
+    },
+    {
+      "binding": "QA_MAIL_AUTHORITY",
+      "service": "ohmyho-control-store-poc-private-fullstack",
+      "entrypoint": "MailSendRuntime",
+    },
+    {
+      "binding": "MAIL_GATEWAY",
+      "service": "ohmyho-mail-gateway-poc-private-fullstack",
+      "entrypoint": "MailEgressEntrypoint",
+    },
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "QA_MAIL_PERMITS", "class_name": "QaMailPermit" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["QaMailPermit"] }],
+}

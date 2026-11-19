@@ -1,0 +1,569 @@
+{
+  "version": 1,
+  "review": "reviewed",
+  "diagram": {
+    "id": "customer-deployment",
+    "title": "Customer deployment — bounded orchestration and outcomes",
+    "family": "process",
+    "syntax": "flowchart",
+    "provenance": "curated",
+    "context": "implemented",
+    "nodes": [
+      {
+        "id": "request",
+        "label": "DeploymentRequestedV1 after pending cleanup",
+        "evidence": [
+          {
+            "line": 619,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "5a34741a0d9f2c05217248a262f0d18759ec4df3ae7a9ebb8594ca2a52849b30",
+            "symbol": "runProductCommandWorkflow"
+          }
+        ]
+      },
+      {
+        "id": "refresh",
+        "label": "Read refresh with current provider target",
+        "evidence": [
+          {
+            "line": 814,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "b3b3a5448072b910cf02e8394153358aaba446d112c5d3cb912f49d7816806e3",
+            "symbol": "runDeployment"
+          },
+          {
+            "line": 71,
+            "path": "apps/control-store/src/catalog/provisioning/binding-refresh-proof.ts",
+            "sha256": "e56c621eade5389ce1f3b2f835d4d9c621cadbb286ec2931d57247bd31047453",
+            "symbol": "bindingRefreshStatements"
+          }
+        ]
+      },
+      {
+        "id": "source",
+        "label": "Fetch exact source archive",
+        "evidence": [
+          {
+            "line": 814,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "b3b3a5448072b910cf02e8394153358aaba446d112c5d3cb912f49d7816806e3",
+            "symbol": "runDeployment"
+          }
+        ]
+      },
+      {
+        "id": "build",
+        "label": "Start isolated build and poll artifact",
+        "evidence": [
+          {
+            "line": 814,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "b3b3a5448072b910cf02e8394153358aaba446d112c5d3cb912f49d7816806e3",
+            "symbol": "runDeployment"
+          }
+        ]
+      },
+      {
+        "id": "database",
+        "label": "Ensure resources; optional Native admission; bounded mail and database waits",
+        "evidence": [
+          {
+            "line": 814,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "b3b3a5448072b910cf02e8394153358aaba446d112c5d3cb912f49d7816806e3",
+            "symbol": "runDeployment"
+          },
+          {
+            "line": 161,
+            "path": "apps/control-store/src/catalog/identity/native-auth-resource-operations.ts",
+            "sha256": "26ca39f17a5576b437de6d8423bab1c2d3a637a9b6b99d14048c66d88ae52b51",
+            "symbol": "resolveNativeAuthDatabaseClaim"
+          }
+        ]
+      },
+      {
+        "id": "candidate",
+        "label": "Stage immutable candidate and persist receipt",
+        "evidence": [
+          {
+            "line": 1230,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "8638f7c6459e1bf371147010f1ac84c4e5956be1f1af3200de7dae2f66fa1e89",
+            "symbol": "activateWfpCandidate"
+          }
+        ]
+      },
+      {
+        "id": "fence",
+        "label": "Authorize candidate and target Native launch policy",
+        "evidence": [
+          {
+            "line": 1230,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "8638f7c6459e1bf371147010f1ac84c4e5956be1f1af3200de7dae2f66fa1e89",
+            "symbol": "activateWfpCandidate"
+          },
+          {
+            "line": 25,
+            "path": "apps/control-store/src/catalog/provisioning/deployment-authorization.ts",
+            "sha256": "45c12e5545eba21025a1092ea337f06d8ae5e235813e7f4535f8bc9044742fc6",
+            "symbol": "authorize"
+          }
+        ]
+      },
+      {
+        "id": "activate",
+        "label": "Activate gateway; recheck authorization and Native launch; finalize",
+        "evidence": [
+          {
+            "line": 1230,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "8638f7c6459e1bf371147010f1ac84c4e5956be1f1af3200de7dae2f66fa1e89",
+            "symbol": "activateWfpCandidate"
+          },
+          {
+            "line": 25,
+            "path": "apps/control-store/src/catalog/provisioning/deployment-authorization.ts",
+            "sha256": "45c12e5545eba21025a1092ea337f06d8ae5e235813e7f4535f8bc9044742fc6",
+            "symbol": "authorize"
+          },
+          {
+            "line": 160,
+            "path": "apps/control-store/src/catalog/provisioning/deployment-finalization.ts",
+            "sha256": "a868de80eeacaa2a82bfe5d9d0c78476470c7f13f0718ee3fa5c74d9d38e071a",
+            "symbol": "finalizeProductCandidate"
+          }
+        ]
+      },
+      {
+        "id": "success",
+        "label": "Confirmed deployment completion",
+        "evidence": [
+          {
+            "line": 1230,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "8638f7c6459e1bf371147010f1ac84c4e5956be1f1af3200de7dae2f66fa1e89",
+            "symbol": "activateWfpCandidate"
+          },
+          {
+            "line": 1491,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "b5942b20199232e647e049082998cb83039fed24324d94448dca1d85307d5e85",
+            "symbol": "finishBindingRefresh"
+          }
+        ]
+      },
+      {
+        "id": "failed",
+        "label": "Known failure persisted",
+        "evidence": [
+          {
+            "line": 965,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "7556df6c94946cd09db2f4f068d546e2b0bfa701023952b7d9d1488628873d36",
+            "symbol": "failDeployment"
+          }
+        ]
+      },
+      {
+        "id": "reconcile",
+        "label": "Persist uncertain provider outcome for reconciliation",
+        "evidence": [
+          {
+            "line": 1936,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "532e244473bc5b00d4be5553422697245984915296d8a08c7c1a3c87605fbcb1",
+            "symbol": "reconcile"
+          }
+        ]
+      },
+      {
+        "id": "compensate",
+        "label": "Clean up or compensate candidate",
+        "evidence": [
+          {
+            "line": 1560,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "2bb700b404eaadb0b0c54ecb12891a7c8ba6d8b63a0ab762e3efe89149e06319",
+            "symbol": "cleanupCandidateForReconciliation"
+          },
+          {
+            "line": 1507,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "4eba36d9256fbe3913c43cf645c62627044c74b8d6d81adad48eb10bded1fa24",
+            "symbol": "compensateSupersededCandidate"
+          }
+        ]
+      },
+      {
+        "id": "superseded",
+        "label": "Superseded candidate terminalized",
+        "evidence": [
+          {
+            "line": 1507,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "4eba36d9256fbe3913c43cf645c62627044c74b8d6d81adad48eb10bded1fa24",
+            "symbol": "compensateSupersededCandidate"
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "id": "request-refresh",
+        "from": "request",
+        "to": "refresh",
+        "label": "Deployment request",
+        "evidence": [
+          {
+            "line": 619,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "5a34741a0d9f2c05217248a262f0d18759ec4df3ae7a9ebb8594ca2a52849b30",
+            "symbol": "runProductCommandWorkflow"
+          }
+        ]
+      },
+      {
+        "id": "refresh-source",
+        "from": "refresh",
+        "to": "source",
+        "label": "No private binding refresh",
+        "evidence": [
+          {
+            "line": 814,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "b3b3a5448072b910cf02e8394153358aaba446d112c5d3cb912f49d7816806e3",
+            "symbol": "runDeployment"
+          }
+        ]
+      },
+      {
+        "id": "refresh-candidate",
+        "from": "refresh",
+        "to": "candidate",
+        "label": "Reusable artifact and matching current database target",
+        "evidence": [
+          {
+            "line": 814,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "b3b3a5448072b910cf02e8394153358aaba446d112c5d3cb912f49d7816806e3",
+            "symbol": "runDeployment"
+          },
+          {
+            "line": 71,
+            "path": "apps/control-store/src/catalog/provisioning/binding-refresh-proof.ts",
+            "sha256": "e56c621eade5389ce1f3b2f835d4d9c621cadbb286ec2931d57247bd31047453",
+            "symbol": "bindingRefreshStatements"
+          }
+        ]
+      },
+      {
+        "id": "refresh-success",
+        "from": "refresh",
+        "to": "success",
+        "label": "Already completed, or published refresh finalized",
+        "evidence": [
+          {
+            "line": 814,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "b3b3a5448072b910cf02e8394153358aaba446d112c5d3cb912f49d7816806e3",
+            "symbol": "runDeployment"
+          },
+          {
+            "line": 1491,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "b5942b20199232e647e049082998cb83039fed24324d94448dca1d85307d5e85",
+            "symbol": "finishBindingRefresh"
+          }
+        ]
+      },
+      {
+        "id": "source-build",
+        "from": "source",
+        "to": "build",
+        "label": "Archive observed",
+        "evidence": [
+          {
+            "line": 814,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "b3b3a5448072b910cf02e8394153358aaba446d112c5d3cb912f49d7816806e3",
+            "symbol": "runDeployment"
+          }
+        ]
+      },
+      {
+        "id": "source-reconcile",
+        "from": "source",
+        "to": "reconcile",
+        "label": "Archive uncertain",
+        "evidence": [
+          {
+            "line": 814,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "b3b3a5448072b910cf02e8394153358aaba446d112c5d3cb912f49d7816806e3",
+            "symbol": "runDeployment"
+          }
+        ]
+      },
+      {
+        "id": "build-database",
+        "from": "build",
+        "to": "database",
+        "label": "Artifact observed and digest present",
+        "evidence": [
+          {
+            "line": 814,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "b3b3a5448072b910cf02e8394153358aaba446d112c5d3cb912f49d7816806e3",
+            "symbol": "runDeployment"
+          }
+        ]
+      },
+      {
+        "id": "build-failed",
+        "from": "build",
+        "to": "failed",
+        "label": "Known build failure",
+        "evidence": [
+          {
+            "line": 814,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "b3b3a5448072b910cf02e8394153358aaba446d112c5d3cb912f49d7816806e3",
+            "symbol": "runDeployment"
+          }
+        ]
+      },
+      {
+        "id": "build-reconcile",
+        "from": "build",
+        "to": "reconcile",
+        "label": "No usable artifact after bounded polling",
+        "evidence": [
+          {
+            "line": 814,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "b3b3a5448072b910cf02e8394153358aaba446d112c5d3cb912f49d7816806e3",
+            "symbol": "runDeployment"
+          }
+        ]
+      },
+      {
+        "id": "database-candidate",
+        "from": "database",
+        "to": "candidate",
+        "label": "Resources ready",
+        "evidence": [
+          {
+            "line": 814,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "b3b3a5448072b910cf02e8394153358aaba446d112c5d3cb912f49d7816806e3",
+            "symbol": "runDeployment"
+          }
+        ]
+      },
+      {
+        "id": "database-failed",
+        "from": "database",
+        "to": "failed",
+        "label": "Known resource or migration failure",
+        "evidence": [
+          {
+            "line": 814,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "b3b3a5448072b910cf02e8394153358aaba446d112c5d3cb912f49d7816806e3",
+            "symbol": "runDeployment"
+          }
+        ]
+      },
+      {
+        "id": "database-reconcile",
+        "from": "database",
+        "to": "reconcile",
+        "label": "Not ready after bounded wait",
+        "evidence": [
+          {
+            "line": 814,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "b3b3a5448072b910cf02e8394153358aaba446d112c5d3cb912f49d7816806e3",
+            "symbol": "runDeployment"
+          }
+        ]
+      },
+      {
+        "id": "candidate-fence",
+        "from": "candidate",
+        "to": "fence",
+        "label": "Candidate persisted and secret stage recorded",
+        "evidence": [
+          {
+            "line": 1230,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "8638f7c6459e1bf371147010f1ac84c4e5956be1f1af3200de7dae2f66fa1e89",
+            "symbol": "activateWfpCandidate"
+          }
+        ]
+      },
+      {
+        "id": "candidate-failed",
+        "from": "candidate",
+        "to": "failed",
+        "label": "Provider rejected script",
+        "evidence": [
+          {
+            "line": 1230,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "8638f7c6459e1bf371147010f1ac84c4e5956be1f1af3200de7dae2f66fa1e89",
+            "symbol": "activateWfpCandidate"
+          }
+        ]
+      },
+      {
+        "id": "candidate-reconcile",
+        "from": "candidate",
+        "to": "reconcile",
+        "label": "Stage outcome uncertain",
+        "evidence": [
+          {
+            "line": 1230,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "8638f7c6459e1bf371147010f1ac84c4e5956be1f1af3200de7dae2f66fa1e89",
+            "symbol": "activateWfpCandidate"
+          }
+        ]
+      },
+      {
+        "id": "fence-activate",
+        "from": "fence",
+        "to": "activate",
+        "label": "Authorization and optional Native admission allow candidate",
+        "evidence": [
+          {
+            "line": 1230,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "8638f7c6459e1bf371147010f1ac84c4e5956be1f1af3200de7dae2f66fa1e89",
+            "symbol": "activateWfpCandidate"
+          },
+          {
+            "line": 25,
+            "path": "apps/control-store/src/catalog/provisioning/deployment-authorization.ts",
+            "sha256": "45c12e5545eba21025a1092ea337f06d8ae5e235813e7f4535f8bc9044742fc6",
+            "symbol": "authorize"
+          }
+        ]
+      },
+      {
+        "id": "fence-compensate",
+        "from": "fence",
+        "to": "compensate",
+        "label": "Superseded before activation",
+        "evidence": [
+          {
+            "line": 1230,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "8638f7c6459e1bf371147010f1ac84c4e5956be1f1af3200de7dae2f66fa1e89",
+            "symbol": "activateWfpCandidate"
+          }
+        ]
+      },
+      {
+        "id": "activate-success",
+        "from": "activate",
+        "to": "success",
+        "label": "Healthy and finalization confirmed",
+        "evidence": [
+          {
+            "line": 1230,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "8638f7c6459e1bf371147010f1ac84c4e5956be1f1af3200de7dae2f66fa1e89",
+            "symbol": "activateWfpCandidate"
+          }
+        ]
+      },
+      {
+        "id": "activate-compensate",
+        "from": "activate",
+        "to": "compensate",
+        "label": "Absent, unhealthy or superseded",
+        "evidence": [
+          {
+            "line": 1230,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "8638f7c6459e1bf371147010f1ac84c4e5956be1f1af3200de7dae2f66fa1e89",
+            "symbol": "activateWfpCandidate"
+          }
+        ]
+      },
+      {
+        "id": "activate-reconcile",
+        "from": "activate",
+        "to": "reconcile",
+        "label": "Uncertain activation or secret receipt, or finalization conflict",
+        "evidence": [
+          {
+            "line": 1230,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "8638f7c6459e1bf371147010f1ac84c4e5956be1f1af3200de7dae2f66fa1e89",
+            "symbol": "activateWfpCandidate"
+          }
+        ]
+      },
+      {
+        "id": "compensate-failed",
+        "from": "compensate",
+        "to": "failed",
+        "label": "Unhealthy deployment compensated",
+        "evidence": [
+          {
+            "line": 1560,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "2bb700b404eaadb0b0c54ecb12891a7c8ba6d8b63a0ab762e3efe89149e06319",
+            "symbol": "cleanupCandidateForReconciliation"
+          }
+        ]
+      },
+      {
+        "id": "compensate-reconcile",
+        "from": "compensate",
+        "to": "reconcile",
+        "label": "Cleanup uncertain or no current outcome",
+        "evidence": [
+          {
+            "line": 1560,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "2bb700b404eaadb0b0c54ecb12891a7c8ba6d8b63a0ab762e3efe89149e06319",
+            "symbol": "cleanupCandidateForReconciliation"
+          }
+        ]
+      },
+      {
+        "id": "compensate-superseded",
+        "from": "compensate",
+        "to": "superseded",
+        "label": "Cleanup observed and superseding operation known",
+        "evidence": [
+          {
+            "line": 1507,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "4eba36d9256fbe3913c43cf645c62627044c74b8d6d81adad48eb10bded1fa24",
+            "symbol": "compensateSupersededCandidate"
+          }
+        ]
+      },
+      {
+        "id": "refresh-reconcile",
+        "from": "refresh",
+        "to": "reconcile",
+        "label": "Published refresh cannot be finalized",
+        "evidence": [
+          {
+            "line": 1491,
+            "path": "apps/orchestrator/src/deployment-workflow.ts",
+            "sha256": "b5942b20199232e647e049082998cb83039fed24324d94448dca1d85307d5e85",
+            "symbol": "finishBindingRefresh"
+          }
+        ]
+      }
+    ],
+    "direction": "TD"
+  }
+}

@@ -1,0 +1,4331 @@
+import { isUserSecretName } from "@ohmyhost/contracts/secret-names";
+import { MCP_CONNECTION_ID_PATTERN } from "@ohmyhost/contracts/organization-mcp-connections";
+import {
+  DATABASE_PAGE_MAX_ITEMS,
+  parseDatabaseCursor,
+  parseDatabaseDeliveryId,
+  parseDatabaseListLimit,
+  parseDatabaseScheduleName,
+  parseDatabaseUsageWindow,
+  parseDatabaseWatchCreateRequest,
+  parseDatabaseWatchId,
+  parseDatabaseWebhookCreateRequest,
+  parseDatabaseWebhookId,
+  type DatabaseWatchRequest,
+  type DatabaseWebhookEventPattern,
+} from "@ohmyhost/contracts/database-events";
+import {
+  DATABASE_TABLE_MAX_PRIMARY_KEY_COLUMNS,
+  isDatabaseTableIdentifier,
+} from "@ohmyhost/contracts/database-tables";
+import {
+  databaseSizeForMemory,
+  type DatabaseComputeSelection,
+} from "@ohmyhost/contracts/database-sizes";
+import {
+  isProjectDataChangeKind,
+  type ProjectDataChangeKind,
+} from "@ohmyhost/contracts/project-data-changes";
+import type { ManagedMailCommand, SharedMailCommand } from "@ohmyhost/sdk-ts";
+import type { NativeAuthCommand } from "./native-auth.js";
+import { isNativeAuthRedirectPath } from "@ohmyhost/contracts/native-auth";
+import { USER_API_KEY_ID } from "@ohmyhost/contracts/user-api-keys";
+import { WORKOS_USER_API_KEY_PATTERN } from "@ohmyhost/workos-auth-contracts/user-api-keys";
+import { isProfileName, isProfileUserId } from "./profile-store.js";
+import {
+  isManagedSourcePath,
+  parseManagedSourceRequest,
+  type ManagedSourceUploadRequest,
+  type ManagedSourceRestoreRequest,
+  type ManagedSourceInitializeRequest,
+} from "@ohmyhost/contracts/managed-sources";
+export type SourceCliCommand =
+  | { readonly kind: "source-inspect"; readonly directory: string }
+  | {
+      readonly kind: "source-read";
+      readonly action: "status" | "files" | "file" | "versions" | "diff" | "upload";
+      readonly projectId: string;
+      readonly commitSha?: string;
+      readonly path?: string;
+      readonly limit?: number;
+      readonly beforeCommitSha?: string;
+      readonly fromCommitSha?: string;
+      readonly toCommitSha?: string;
+      readonly operationId?: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "source-publish";
+      readonly projectId: string;
+      readonly directory: string;
+      readonly request: ManagedSourceUploadRequest;
+      readonly explicitExpectedCommit: boolean;
+      readonly idempotencyKey: string;
+      readonly wait: boolean;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "source-complete";
+      readonly projectId: string;
+      readonly directory: string;
+      readonly operationId?: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "source-initialize";
+      readonly projectId: string;
+      readonly request: ManagedSourceInitializeRequest;
+      readonly idempotencyKey: string;
+      readonly wait: boolean;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "source-restore";
+      readonly projectId: string;
+      readonly request: ManagedSourceRestoreRequest;
+      readonly idempotencyKey: string;
+      readonly wait: boolean;
+      readonly credentialStore: "native";
+    };
+export type ProductCliCommand =
+  | SourceCliCommand
+  | {
+      readonly kind: "native-auth";
+      readonly request: NativeAuthCommand;
+      readonly stdin: boolean;
+      readonly credentialStore: "native";
+      readonly environmentToken?: HandedAccount;
+      readonly profileAccount?: HandedAccount;
+    }
+  | {
+      readonly kind: "project-data-plan";
+      readonly projectId: string;
+      readonly change: ProjectDataChangeKind;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "project-data-change";
+      readonly projectId: string;
+      readonly change: ProjectDataChangeKind;
+      readonly ifMatch: string;
+      readonly confirmationToken: string;
+      readonly idempotencyKey: string;
+      readonly yes: true;
+      readonly wait: boolean;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "github-connect";
+      readonly organizationId: string;
+      readonly idempotencyKey: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "github-status";
+      readonly organizationId: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "github-disconnect";
+      readonly organizationId: string;
+      readonly yes: true;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "connection-begin";
+      readonly organizationId: string;
+      readonly projectId?: string;
+      readonly environmentId?: string;
+      readonly idempotencyKey: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "connection-list";
+      readonly organizationId: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "connection-status";
+      readonly organizationId: string;
+      readonly requestId: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "connection-discover";
+      readonly organizationId: string;
+      readonly projectId?: string;
+      readonly environmentId?: string;
+      readonly grantId: string;
+      readonly providerOrganizationId?: number;
+      readonly teamId?: number;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "connection-import";
+      readonly organizationId: string;
+      readonly projectId: string;
+      readonly environmentId: string;
+      readonly grantId: string;
+      readonly providerOrganizationId: number;
+      readonly teamId: number;
+      readonly connectionId: number;
+      readonly idempotencyKey: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "connection-disconnect";
+      readonly organizationId: string;
+      readonly grantId: string;
+      readonly idempotencyKey: string;
+      readonly yes: true;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "organization-mcp-connections-list";
+      readonly organizationId: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "organization-mcp-connection-revoke";
+      readonly organizationId: string;
+      readonly connectionId: string;
+      readonly yes: true;
+      readonly credentialStore: "native";
+    }
+  | ({
+      readonly kind: "database-compute-set";
+      readonly projectId: string;
+      readonly environment: "dev" | "prod";
+      readonly idempotencyKey: string;
+      readonly wait: boolean;
+      readonly credentialStore: "native";
+    } & DatabaseComputeSelection)
+  | {
+      readonly kind: "database-compute-get";
+      readonly projectId: string;
+      readonly environment: "dev" | "prod";
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "project-context";
+      readonly projectId: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "project-notes-set";
+      readonly projectId: string;
+      readonly markdown: string;
+      readonly expectedVersion: number;
+      readonly idempotencyKey: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "export-create";
+      readonly projectId: string;
+      readonly idempotencyKey: string;
+      readonly stdin: true;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "export-get";
+      readonly projectId: string;
+      readonly exportId: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "export-download-link";
+      readonly projectId: string;
+      readonly exportId: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "token-create";
+      readonly organizationId: string;
+      readonly name: string;
+      readonly idempotencyKey: string;
+      readonly outputPath: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "token-list";
+      readonly organizationId: string;
+      readonly after?: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "token-revoke";
+      readonly organizationId: string;
+      readonly keyId: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "feedback-submit";
+      readonly report: import("@ohmyhost/sdk-ts").FeedbackSubmission;
+      readonly idempotencyKey: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "feedback-status";
+      readonly feedbackId: string;
+      readonly cursor?: string;
+      readonly credentialStore: "native";
+    }
+  | { kind: "billing-recharge-get"; organizationId: string; credentialStore: "native" }
+  | ({ kind: "billing-recharge-set"; credentialStore: "native" } & {
+      organizationId: string;
+      enabled: boolean;
+      monthlyLimitMinor: number;
+      consent: "off_session_v1" | null;
+      revision: number;
+      idempotencyKey: string;
+    })
+  | {
+      readonly kind: "billing-checkout";
+      readonly organizationId: string;
+      readonly offer: "topup" | "paid";
+      readonly packs: number;
+      readonly idempotencyKey: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "billing-status";
+      readonly organizationId: string;
+      readonly checkoutId: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "billing-portal";
+      readonly organizationId: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "credits-usage";
+      readonly organizationId: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "credits-account";
+      readonly organizationId: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "referral-link";
+      readonly organizationId: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "credits-balance";
+      readonly organizationId: string;
+      readonly credentialStore: "native";
+    }
+  | { readonly kind: "budget-get"; readonly projectId: string; readonly credentialStore: "native" }
+  | {
+      readonly kind: "budget-set";
+      readonly projectId: string;
+      readonly amountMicros: string | null;
+      readonly mode: "continue" | "stop";
+      readonly idempotencyKey: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      /** Moves a project to a chosen address once its gateways serve it. */
+      readonly kind: "project-handle-set";
+      readonly projectId: string;
+      readonly handle: string;
+      readonly ifMatch: string;
+      readonly idempotencyKey: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      /** Asks whether a project address is free; the candidate is sent exactly as the agent typed it. */
+      readonly kind: "project-handle-check";
+      readonly handle: string;
+      readonly credentialStore: "native";
+    }
+  | { readonly kind: "help"; readonly topic?: string }
+  | { readonly kind: "version" }
+  | { readonly kind: "whoami"; readonly credentialStore: "native" }
+  | {
+      readonly kind: "organization-create";
+      readonly signupSource?: string;
+      readonly name: string;
+      readonly idempotencyKey: string;
+      readonly credentialStore: "native";
+    }
+  | { readonly kind: "organization-list"; readonly credentialStore: "native" }
+  | {
+      readonly kind: "organization-use";
+      readonly organizationId: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "init";
+      readonly directory: string;
+      readonly project?: string;
+      readonly root?: string;
+      /** The hosting region of the project the repository deploys to; `us` when unknown. */
+      readonly region?: "us" | "eu";
+      readonly dryRun: boolean;
+    }
+  | {
+      readonly kind: "login";
+      readonly organizationId?: string;
+      /** The user the browser must sign in as; a different account stores nothing. */
+      readonly userId?: string;
+      readonly credentialStore: "native";
+    }
+  | { readonly kind: "profile-list" }
+  | {
+      readonly kind: "logout";
+      readonly revoke: boolean;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "operation-get";
+      readonly operationId: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "operation-reconcile";
+      readonly operationId: string;
+      readonly idempotencyKey: string;
+      readonly yes: true;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "project-create";
+      readonly organizationId: string;
+      readonly name: string;
+      readonly dataMode?: "shared" | "isolated";
+      readonly devAccessMode?: "protected" | "public";
+      readonly includeDevelopmentEnvironment?: boolean;
+      readonly region?: "us" | "eu";
+      readonly idempotencyKey: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "project-list";
+      readonly cursor?: string;
+      readonly limit: number;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "project-status";
+      readonly projectId: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "project-development-add";
+      readonly projectId: string;
+      readonly idempotencyKey: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "project-preview-get";
+      readonly projectId: string;
+      readonly environment: "dev" | "prod";
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "project-preview-open";
+      readonly projectId: string;
+      readonly environment: "dev" | "prod";
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "project-preview-stop";
+      readonly projectId: string;
+      readonly environment: "dev" | "prod";
+      readonly idempotencyKey: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "project-preview-rotate";
+      readonly projectId: string;
+      readonly environment: "dev" | "prod";
+      readonly idempotencyKey: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "project-dev-share-link";
+      readonly projectId: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "project-dev-share-rotate";
+      readonly projectId: string;
+      readonly idempotencyKey: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "project-dev-share-revoke";
+      readonly projectId: string;
+      readonly idempotencyKey: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "project-dev-access-mode-set";
+      readonly projectId: string;
+      readonly mode: "protected" | "public";
+      readonly idempotencyKey: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "project-dev-access-create";
+      readonly projectId: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "project-flag-status";
+      readonly projectId: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "project-flag-set";
+      readonly projectId: string;
+      readonly enabled: boolean;
+      readonly idempotencyKey: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "database-write";
+      readonly projectId: string;
+      readonly environment: "dev" | "prod";
+      readonly statementFile: string;
+      readonly parameters: readonly import("@ohmyhost/contracts/database-access").DatabaseJson[];
+      readonly idempotencyKey: string;
+      readonly yes: true;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "database-query";
+      readonly environment: "dev" | "prod";
+      readonly projectId: string;
+      readonly statement: string;
+      readonly parameters: readonly (string | number | boolean | null)[];
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "database-access-create";
+      readonly projectId: string;
+      readonly environment: "dev" | "prod";
+      readonly mode: "read" | "write";
+      readonly ttlSeconds: number;
+      readonly label: string | null;
+      readonly yes: true;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "database-access-list";
+      readonly projectId: string;
+      readonly environment?: "dev" | "prod";
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "database-access-revoke";
+      readonly projectId: string;
+      readonly accessId: string;
+      readonly yes: true;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "database-watch-create";
+      readonly projectId: string;
+      readonly environment: "dev" | "prod";
+      readonly request: DatabaseWatchRequest;
+      readonly idempotencyKey: string;
+      readonly yes: true;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "database-table-create";
+      readonly projectId: string;
+      readonly environment: "dev" | "prod";
+      readonly table: string;
+      readonly columnsFile: string;
+      readonly primaryKey: readonly string[];
+      readonly idempotencyKey: string;
+      readonly yes: true;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "database-watch-list";
+      readonly projectId: string;
+      readonly environment: "dev" | "prod";
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "database-watch-delete";
+      readonly projectId: string;
+      readonly environment: "dev" | "prod";
+      readonly watchId: string;
+      readonly idempotencyKey: string;
+      readonly yes: true;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "database-webhook-create";
+      readonly projectId: string;
+      readonly environment: "dev" | "prod";
+      readonly url: string;
+      readonly eventTypes: readonly DatabaseWebhookEventPattern[];
+      readonly headersFile: string | null;
+      readonly idempotencyKey: string;
+      readonly yes: true;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "database-webhook-subscription-status";
+      readonly projectId: string;
+      readonly environment: "dev" | "prod";
+      readonly subscriptionId: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "database-webhook-subscription-activate";
+      readonly projectId: string;
+      readonly environment: "dev" | "prod";
+      readonly subscriptionId: string;
+      readonly generation: number;
+      readonly url: string;
+      readonly eventTypes: readonly DatabaseWebhookEventPattern[];
+      readonly headersFile: string | null;
+      readonly outputPath: string;
+      readonly idempotencyKey: string;
+      readonly yes: true;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "database-webhook-subscription-deactivate";
+      readonly projectId: string;
+      readonly environment: "dev" | "prod";
+      readonly subscriptionId: string;
+      readonly generation: number;
+      readonly idempotencyKey: string;
+      readonly yes: true;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "database-webhook-list";
+      readonly projectId: string;
+      readonly environment: "dev" | "prod";
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "database-webhook-get";
+      readonly projectId: string;
+      readonly environment: "dev" | "prod";
+      readonly webhookId: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "database-webhook-delete";
+      readonly projectId: string;
+      readonly environment: "dev" | "prod";
+      readonly webhookId: string;
+      readonly idempotencyKey: string | null;
+      readonly yes: true;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "database-webhook-test";
+      readonly projectId: string;
+      readonly environment: "dev" | "prod";
+      readonly webhookId: string;
+      readonly idempotencyKey: string | null;
+      readonly yes: true;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "database-webhook-deliveries";
+      readonly projectId: string;
+      readonly environment: "dev" | "prod";
+      readonly webhookId: string | null;
+      readonly limit: number | null;
+      readonly cursor: string | null;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "database-webhook-replay";
+      readonly projectId: string;
+      readonly environment: "dev" | "prod";
+      readonly deliveryId: string;
+      readonly idempotencyKey: string | null;
+      readonly yes: true;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "database-schedule-set";
+      readonly projectId: string;
+      readonly environment: "dev" | "prod";
+      readonly name: string;
+      readonly cron: string | null;
+      readonly everySeconds: number | null;
+      readonly statementsFile: string;
+      readonly timeoutMs: number | null;
+      readonly enabled: boolean | null;
+      readonly yes: true;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "database-schedule-list";
+      readonly projectId: string;
+      readonly environment: "dev" | "prod";
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "database-schedule-get";
+      readonly projectId: string;
+      readonly environment: "dev" | "prod";
+      readonly name: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "database-schedule-delete";
+      readonly projectId: string;
+      readonly environment: "dev" | "prod";
+      readonly name: string;
+      readonly yes: true;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "database-schedule-runs";
+      readonly projectId: string;
+      readonly environment: "dev" | "prod";
+      readonly name: string;
+      readonly limit: number | null;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "database-schedule-run";
+      readonly projectId: string;
+      readonly environment: "dev" | "prod";
+      readonly name: string;
+      readonly idempotencyKey: string | null;
+      readonly yes: true;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "database-executions";
+      readonly projectId: string;
+      readonly environment: "dev" | "prod";
+      readonly from: string;
+      readonly to: string;
+      readonly granularity: "hour" | "day";
+      readonly limit: number | null;
+      readonly cursor: string | null;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "database-psql";
+      readonly projectId: string;
+      readonly environment: "dev" | "prod";
+      readonly mode: "read" | "write";
+      readonly ttlSeconds: number;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "link";
+      readonly projectId: string;
+      readonly repositoryOwner: string;
+      readonly repositoryName: string;
+      readonly idempotencyKey: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "source-auto-deploy-set";
+      readonly projectId: string;
+      readonly branch: string;
+      readonly enabled: boolean;
+      readonly idempotencyKey: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "source-auto-deploy-status";
+      readonly projectId: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "plan";
+      readonly projectId: string;
+      readonly commitSha: string;
+      readonly environment?: "dev" | "prod";
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "deploy";
+      readonly projectId: string;
+      /** Exactly one of an existing plan or a commit that is planned first. */
+      readonly planId: string | null;
+      readonly commitSha: string | null;
+      readonly environment?: "dev" | "prod";
+      readonly idempotencyKey: string;
+      readonly yes: true;
+      readonly wait: boolean;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "logs";
+      readonly operationId: string;
+      readonly follow: true;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "deployment-logs";
+      readonly projectId: string;
+      readonly deploymentId: string;
+      readonly cursor?: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "deployment-list";
+      readonly projectId: string;
+      readonly cursor?: string;
+      readonly limit?: number;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "deployment-get";
+      readonly projectId: string;
+      readonly deploymentId: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "rollback-plan";
+      readonly projectId: string;
+      readonly deploymentId: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "rollback";
+      readonly projectId: string;
+      readonly deploymentId: string;
+      readonly ifMatch: string;
+      readonly confirmationToken: string;
+      readonly idempotencyKey: string;
+      readonly yes: true;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "promotion-plan";
+      readonly projectId: string;
+      readonly sourceDeploymentId: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "promote";
+      readonly projectId: string;
+      readonly sourceDeploymentId: string;
+      readonly ifMatch: string;
+      readonly confirmationToken: string;
+      readonly idempotencyKey: string;
+      readonly yes: true;
+      readonly wait: boolean;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "delete-plan";
+      readonly projectId: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "delete";
+      readonly projectId: string;
+      readonly ifMatch: string;
+      readonly confirmationToken: string;
+      readonly idempotencyKey: string;
+      readonly yes: true;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "secret-list";
+      readonly projectId: string;
+      readonly environmentId: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "function-runs";
+      readonly projectId: string;
+      readonly environmentId: string;
+      readonly limit: number;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "secret-set";
+      readonly projectId: string;
+      readonly environmentId: string;
+      readonly name: string;
+      readonly idempotencyKey: string;
+      readonly stdin: true;
+      readonly wait: boolean;
+      /** Handed over from an OHMYHOST_TOKEN process: only a key of this account may run it. */
+      readonly environmentToken?: HandedAccount;
+      /** Handed over for a saved login: the login that runs it must belong to this account. */
+      readonly profileAccount?: HandedAccount;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "secret-delete";
+      readonly projectId: string;
+      readonly environmentId: string;
+      readonly name: string;
+      readonly idempotencyKey: string;
+      readonly wait: boolean;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "shared-mail";
+      readonly request: SharedMailCommand;
+      readonly label: SharedMailCommandLabel;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "managed-mail";
+      readonly request: ManagedMailCommand;
+      readonly label:
+        | "mail domain set"
+        | "mail domain status"
+        | "mail domain delete"
+        | "mail setup"
+        | "mail status"
+        | "mail webhook set"
+        | "mail webhook verify"
+        | "mail webhook disable"
+        | "mail webhook rotate"
+        | "mail messages list"
+        | "mail messages get"
+        | "mail messages retry";
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "domain-cloudflare-authorize";
+      readonly projectId: string;
+      readonly zone: string;
+      readonly idempotencyKey: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "domain-cloudflare-status";
+      readonly projectId: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "domain-cloudflare-apply";
+      readonly projectId: string;
+      readonly idempotencyKey: string;
+      readonly yes: true;
+      readonly wait: true;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "paid-domain-plan";
+      readonly projectId: string;
+      readonly hostname: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "paid-domain-status";
+      readonly projectId: string;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "paid-domain-apply";
+      readonly projectId: string;
+      readonly hostname: string;
+      readonly idempotencyKey: string;
+      readonly yes: true;
+      readonly credentialStore: "native";
+    }
+  | {
+      readonly kind: "paid-domain-delete";
+      readonly projectId: string;
+      readonly hostname: string;
+      readonly idempotencyKey: string;
+      readonly yes: true;
+      readonly credentialStore: "native";
+    };
+
+/**
+ * Remove the global login selector from argv. Every authenticated command accepts it; `login` uses
+ * the same flag to name the login it adds. The value is an alias, never a credential.
+ */
+export const extractProfileName = (
+  argv: readonly string[],
+): { readonly argv: readonly string[]; readonly profileName?: string } => {
+  const index = argv.indexOf("--profile-name");
+  if (index < 0) return { argv };
+  const value = argv[index + 1];
+  if (
+    value === undefined ||
+    !isProfileName(value) ||
+    argv.indexOf("--profile-name", index + 1) >= 0
+  )
+    throw new InvalidCommandError();
+  return { argv: [...argv.slice(0, index), ...argv.slice(index + 2)], profileName: value };
+};
+
+export class InvalidCommandError extends Error {
+  public constructor() {
+    super("The command arguments are invalid.");
+    this.name = "InvalidCommandError";
+  }
+}
+
+function parseSourceCommand(values: string[], wait: boolean): SourceCliCommand {
+  const action = values.shift();
+  if (action === "publish" && values[0] === "complete") {
+    values.shift();
+    if (wait) throw new InvalidCommandError();
+    const options = parseOptionalOptions(values, ["--project", "--directory", "--operation"]);
+    const projectId = options["--project"],
+      operationId = options["--operation"];
+    if (
+      projectId === undefined ||
+      !/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/u.test(projectId) ||
+      (operationId !== undefined && !/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/u.test(operationId))
+    )
+      throw new InvalidCommandError();
+    return {
+      kind: "source-complete",
+      projectId,
+      directory: options["--directory"] ?? ".",
+      operationId,
+      credentialStore: "native",
+    };
+  }
+  if (action === "inspect") {
+    if (wait) throw new InvalidCommandError();
+    const options = parseOptionalOptions(values, ["--directory"]);
+    return { kind: "source-inspect", directory: options["--directory"] ?? "." };
+  }
+  const allowed =
+    action === "publish"
+      ? [
+          "--project",
+          "--directory",
+          "--mode",
+          "--expected-source-generation",
+          "--expected-source-connection",
+          "--expected-commit",
+          "--message",
+          "--idempotency-key",
+        ]
+      : action === "restore"
+        ? [
+            "--project",
+            "--expected-source-generation",
+            "--expected-commit",
+            "--restore-commit",
+            "--message",
+            "--idempotency-key",
+          ]
+        : action === "initialize"
+          ? ["--project", "--template", "--expected-source-generation", "--idempotency-key"]
+          : [
+              "--project",
+              "--commit",
+              "--path",
+              "--limit",
+              "--before",
+              "--from",
+              "--to",
+              "--operation",
+            ];
+  const options = parseOptionalOptions(values, allowed);
+  const projectId = options["--project"];
+  if (projectId === undefined || !/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/u.test(projectId))
+    throw new InvalidCommandError();
+  const credentialStore = "native" as const;
+  if (action === "publish" || action === "restore" || action === "initialize") {
+    const idempotencyKey = options["--idempotency-key"];
+    const rawGeneration = options["--expected-source-generation"];
+    if (
+      idempotencyKey === undefined ||
+      rawGeneration === undefined ||
+      !/^(?:0|[1-9][0-9]*)$/u.test(rawGeneration)
+    )
+      throw new InvalidCommandError();
+    const expected_source_generation = Number(rawGeneration);
+    try {
+      if (action === "initialize")
+        return {
+          kind: "source-initialize",
+          projectId,
+          request: parseManagedSourceRequest("initialize", {
+            expected_source_generation,
+            template: options["--template"] ?? "vite-react",
+          }),
+          idempotencyKey,
+          wait,
+          credentialStore,
+        };
+      const common = {
+        expected_source_generation,
+        expected_commit_sha: options["--expected-commit"] ?? null,
+        message: options["--message"],
+      };
+      if (action === "restore")
+        return {
+          kind: "source-restore",
+          projectId,
+          request: parseManagedSourceRequest("restore", {
+            ...common,
+            restore_commit_sha: options["--restore-commit"],
+          }),
+          idempotencyKey,
+          wait,
+          credentialStore,
+        };
+      return {
+        kind: "source-publish",
+        projectId,
+        directory: options["--directory"] ?? ".",
+        request: parseManagedSourceRequest("upload", {
+          ...common,
+          mode: options["--mode"],
+          expected_source_connection_id: options["--expected-source-connection"] ?? null,
+        }),
+        explicitExpectedCommit: options["--expected-commit"] !== undefined,
+        idempotencyKey,
+        wait,
+        credentialStore,
+      };
+    } catch {
+      throw new InvalidCommandError();
+    }
+  }
+  if (wait || !["status", "files", "file", "versions", "diff", "upload"].includes(action ?? ""))
+    throw new InvalidCommandError();
+  const commitSha = options["--commit"],
+    path = options["--path"],
+    beforeCommitSha = options["--before"],
+    fromCommitSha = options["--from"],
+    toCommitSha = options["--to"],
+    operationId = options["--operation"];
+  const permitted =
+    action === "status"
+      ? ["--project"]
+      : action === "versions"
+        ? ["--project", "--limit", "--before"]
+        : action === "diff"
+          ? ["--project", "--from", "--to"]
+          : action === "upload"
+            ? ["--project", "--operation"]
+            : action === "file"
+              ? ["--project", "--commit", "--path"]
+              : ["--project", "--commit"];
+  if (
+    Object.keys(options).some((key) => !permitted.includes(key)) ||
+    [commitSha, beforeCommitSha, fromCommitSha, toCommitSha].some(
+      (value) => value !== undefined && !/^[a-f0-9]{40}$/u.test(value),
+    ) ||
+    (action === "file" && !isManagedSourcePath(path)) ||
+    (action === "diff" && (fromCommitSha === undefined || toCommitSha === undefined)) ||
+    (action === "upload" &&
+      (operationId === undefined || !/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/u.test(operationId)))
+  )
+    throw new InvalidCommandError();
+  const limit = options["--limit"] === undefined ? undefined : decimalLimit(options["--limit"]);
+  if (limit !== undefined && (!Number.isSafeInteger(limit) || limit < 1 || limit > 100))
+    throw new InvalidCommandError();
+  return {
+    kind: "source-read",
+    action: action as Extract<SourceCliCommand, { kind: "source-read" }>["action"],
+    projectId,
+    commitSha,
+    path,
+    beforeCommitSha,
+    fromCommitSha,
+    toCommitSha,
+    operationId,
+    limit,
+    credentialStore,
+  };
+}
+
+export type RecognizedCommandLabel =
+  | "auth"
+  | "source inspect"
+  | "source status"
+  | "source files"
+  | "source file"
+  | "source versions"
+  | "source diff"
+  | "source upload"
+  | "source publish"
+  | "source publish complete"
+  | "source initialize"
+  | "source restore"
+  | "project data plan"
+  | "project data change"
+  | "database compute set"
+  | "database compute get"
+  | "project context"
+  | "project notes set"
+  | "export create"
+  | "export get"
+  | "export download-link"
+  | "billing recharge get"
+  | "billing recharge set"
+  | "billing checkout"
+  | "billing status"
+  | "billing portal"
+  | "unknown"
+  | "help"
+  | "version"
+  | "whoami"
+  | "credits account"
+  | "referral link"
+  | "credits balance"
+  | "credits usage"
+  | "budget get"
+  | "budget set"
+  | "init"
+  | "login"
+  | "logout"
+  | "profile list"
+  | "operation get"
+  | "operation reconcile"
+  | "token create"
+  | "token list"
+  | "token revoke"
+  | "feedback submit"
+  | "feedback status"
+  | "project create"
+  | "organization create"
+  | "organization list"
+  | "organization use"
+  | "organization mcp-connections list"
+  | "organization mcp-connections revoke"
+  | "connection begin"
+  | "connection list"
+  | "connection status"
+  | "connection discover"
+  | "connection import"
+  | "connection disconnect"
+  | "github connect"
+  | "github status"
+  | "github disconnect"
+  | "project list"
+  | "project status"
+  | "project dev add"
+  | "project dev-access create"
+  | "project dev-share link"
+  | "project preview get"
+  | "project preview open"
+  | "project preview stop"
+  | "project preview rotate"
+  | "project dev-share rotate"
+  | "project dev-share revoke"
+  | "project dev-access mode"
+  | "project flag status"
+  | "project flag set"
+  | "project handle check"
+  | "project handle set"
+  | "database write"
+  | "database query"
+  | "database access create"
+  | "database access list"
+  | "database access revoke"
+  | "database watch create"
+  | "database watch list"
+  | "database watch delete"
+  | "database table create"
+  | "database webhook create"
+  | "database webhook subscription activate"
+  | "database webhook subscription deactivate"
+  | "database webhook subscription status"
+  | "database webhook list"
+  | "database webhook get"
+  | "database webhook delete"
+  | "database webhook test"
+  | "database webhook deliveries"
+  | "database webhook replay"
+  | "database schedule set"
+  | "database schedule list"
+  | "database schedule get"
+  | "database schedule delete"
+  | "database schedule runs"
+  | "database schedule run"
+  | "database executions"
+  | "database psql"
+  | "link"
+  | "source auto-deploy set"
+  | "source auto-deploy status"
+  | "domain cloudflare authorize"
+  | "domain cloudflare status"
+  | "domain cloudflare apply"
+  | "domain paid plan"
+  | "domain paid apply"
+  | "domain paid status"
+  | "domain paid delete"
+  | "plan"
+  | "deploy"
+  | "logs"
+  | "deployment logs"
+  | "deployment list"
+  | "deployment get"
+  | "rollback plan"
+  | "rollback"
+  | "deployment promote plan"
+  | "deployment promote"
+  | "delete plan"
+  | "delete"
+  | "secret list"
+  | "function runs"
+  | "secret set"
+  | "secret delete"
+  | "mail setup"
+  | "mail status"
+  | "mail webhook set"
+  | "mail webhook verify"
+  | "mail webhook disable"
+  | "mail webhook rotate"
+  | "mail messages list"
+  | "mail messages get"
+  | "mail messages retry"
+  | "mail domain set"
+  | "mail domain status"
+  | "mail domain delete"
+  | SharedMailCommandLabel;
+
+export type SharedMailCommandLabel =
+  | "mail workspace list"
+  | "mail workspace create"
+  | "mail workspace status"
+  | "mail workspace retire"
+  | "mail workspace dns-authorize"
+  | "mail workspace dns-status"
+  | "mail workspace dns-revoke"
+  | "mail binding get"
+  | "mail binding set"
+  | "mail binding detach"
+  | "mail identity get"
+  | "mail identity declare"
+  | "mail identity verify"
+  | "mail identity revoke"
+  | "mail identity authorize"
+  | "mail identity authorization-status"
+  | "mail identity authorization-revoke";
+
+export const recognizedCommandLabel = (argv: readonly string[]): RecognizedCommandLabel => {
+  const values = [...argv];
+  if (values.includes("--help")) return "help";
+  if (values.includes("--version")) return "version";
+  while (values.length > 0) {
+    const value = values.shift();
+    if (value === "--profile-name") {
+      values.shift();
+      continue;
+    }
+    if (
+      value === "--json" ||
+      value === "--dry-run" ||
+      value === "--revoke" ||
+      value === "--yes" ||
+      value === "--wait" ||
+      value === "--follow" ||
+      value === "--stdin"
+    ) {
+      continue;
+    }
+    if (
+      value === "help" ||
+      value === "version" ||
+      value === "whoami" ||
+      value === "init" ||
+      value === "login" ||
+      value === "logout"
+    )
+      return value;
+    if (value === "profile" && values[0] === "list") return "profile list";
+    if (
+      value === "connection" &&
+      ["begin", "list", "status", "discover", "import", "disconnect"].includes(values[0] ?? "")
+    )
+      return `connection ${values[0]}` as RecognizedCommandLabel;
+    if (value === "github" && values[0] === "connect") return "github connect";
+    if (value === "github" && values[0] === "status") return "github status";
+    if (value === "github" && values[0] === "disconnect") return "github disconnect";
+    if (value === "operation" && values[0] === "get") return "operation get";
+    if (value === "credits" && values[0] === "account") return "credits account";
+    if (value === "referral" && values[0] === "link") return "referral link";
+    if (value === "credits" && values[0] === "balance") return "credits balance";
+    if (value === "billing" && values[0] === "recharge" && values[1] === "get")
+      return "billing recharge get";
+    if (value === "billing" && values[0] === "recharge" && values[1] === "set")
+      return "billing recharge set";
+    if (value === "billing" && values[0] === "checkout") return "billing checkout";
+    if (value === "billing" && values[0] === "status") return "billing status";
+    if (value === "billing" && values[0] === "portal") return "billing portal";
+    if (value === "credits" && values[0] === "usage") return "credits usage";
+    if (value === "budget" && values[0] === "get") return "budget get";
+    if (value === "budget" && values[0] === "set") return "budget set";
+    if (value === "operation" && values[0] === "reconcile") return "operation reconcile";
+    if (value === "token" && ["create", "list", "revoke"].includes(values[0] ?? ""))
+      return `token ${values[0]}` as RecognizedCommandLabel;
+    if (
+      value === "export" &&
+      (values[0] === "create" || values[0] === "get" || values[0] === "download-link")
+    )
+      return `export ${values[0]}`;
+    if (value === "feedback" && values[0] === "submit") return "feedback submit";
+    if (value === "feedback" && values[0] === "status") return "feedback status";
+    if (value === "project" && values[0] === "create") return "project create";
+    if (value === "project" && values[0] === "data" && values[1] === "plan")
+      return "project data plan";
+    if (value === "project" && values[0] === "data" && values[1] === "change")
+      return "project data change";
+    if (value === "organization" && values[0] === "create") return "organization create";
+    if (value === "organization" && values[0] === "list") return "organization list";
+    if (value === "organization" && values[0] === "use") return "organization use";
+    if (value === "organization" && values[0] === "mcp-connections") {
+      if (values[1] === "list") return "organization mcp-connections list";
+      if (values[1] === "revoke") return "organization mcp-connections revoke";
+    }
+    if (value === "project" && values[0] === "list") return "project list";
+    if (value === "project" && values[0] === "context") return "project context";
+    if (value === "project" && values[0] === "notes" && values[1] === "set")
+      return "project notes set";
+    if (value === "project" && values[0] === "status") return "project status";
+    if (value === "project" && values[0] === "dev" && values[1] === "add") return "project dev add";
+    if (
+      value === "project" &&
+      values[0] === "preview" &&
+      ["get", "open", "stop", "rotate"].includes(values[1] ?? "")
+    )
+      return `project preview ${values[1]}` as RecognizedCommandLabel;
+    if (value === "project" && values[0] === "handle" && values[1] === "check")
+      return "project handle check";
+    if (value === "project" && values[0] === "handle" && values[1] === "set")
+      return "project handle set";
+    if (
+      value === "project" &&
+      values[0] === "dev-share" &&
+      ["link", "rotate", "revoke"].includes(values[1] ?? "")
+    )
+      return values[1] === "link"
+        ? "project dev-share link"
+        : values[1] === "rotate"
+          ? "project dev-share rotate"
+          : "project dev-share revoke";
+    if (value === "project" && values[0] === "dev-access" && values[1] === "mode")
+      return "project dev-access mode";
+    if (value === "project" && values[0] === "dev-access" && values[1] === "create")
+      return "project dev-access create";
+    if (value === "project" && values[0] === "flag" && values[1] === "status")
+      return "project flag status";
+    if (value === "project" && values[0] === "flag" && values[1] === "set")
+      return "project flag set";
+    if (value === "database" && values[0] === "compute" && values[1] === "set")
+      return "database compute set";
+    if (value === "database" && values[0] === "compute" && values[1] === "get")
+      return "database compute get";
+    if (value === "database" && values[0] === "write") return "database write";
+    if (value === "database" && values[0] === "query") return "database query";
+    if (value === "database" && values[0] === "access") {
+      if (values[1] === "create") return "database access create";
+      if (values[1] === "list") return "database access list";
+      if (values[1] === "revoke") return "database access revoke";
+    }
+    if (value === "database" && values[0] === "watch") {
+      if (values[1] === "create") return "database watch create";
+      if (values[1] === "list") return "database watch list";
+      if (values[1] === "delete") return "database watch delete";
+    }
+    if (value === "database" && values[0] === "table" && values[1] === "create")
+      return "database table create";
+    if (value === "database" && values[0] === "webhook") {
+      if (
+        values[1] === "subscription" &&
+        ["activate", "deactivate", "status"].includes(values[2] ?? "")
+      )
+        return `database webhook subscription ${values[2]}` as RecognizedCommandLabel;
+      if (values[1] === "create") return "database webhook create";
+      if (values[1] === "list") return "database webhook list";
+      if (values[1] === "get") return "database webhook get";
+      if (values[1] === "delete") return "database webhook delete";
+      if (values[1] === "test") return "database webhook test";
+      if (values[1] === "deliveries") return "database webhook deliveries";
+      if (values[1] === "replay") return "database webhook replay";
+    }
+    if (value === "database" && values[0] === "schedule") {
+      if (values[1] === "set") return "database schedule set";
+      if (values[1] === "list") return "database schedule list";
+      if (values[1] === "get") return "database schedule get";
+      if (values[1] === "delete") return "database schedule delete";
+      if (values[1] === "runs") return "database schedule runs";
+      if (values[1] === "run") return "database schedule run";
+    }
+    if (value === "database" && values[0] === "executions") return "database executions";
+    if (value === "database" && values[0] === "psql") return "database psql";
+    if (value === "link" || value === "plan" || value === "deploy" || value === "logs")
+      return value;
+    if (value === "source" && values[0] === "publish" && values[1] === "complete")
+      return "source publish complete";
+    if (
+      value === "source" &&
+      [
+        "inspect",
+        "status",
+        "files",
+        "file",
+        "versions",
+        "diff",
+        "upload",
+        "publish",
+        "initialize",
+        "restore",
+      ].includes(values[0] ?? "")
+    )
+      return `source ${values[0]}` as RecognizedCommandLabel;
+    if (value === "source" && values[0] === "auto-deploy") {
+      if (values[1] === "set") return "source auto-deploy set";
+      if (values[1] === "status") return "source auto-deploy status";
+    }
+    if (value === "domain" && values[0] === "cloudflare") {
+      if (values[1] === "authorize") return "domain cloudflare authorize";
+      if (values[1] === "status") return "domain cloudflare status";
+      if (values[1] === "apply") return "domain cloudflare apply";
+    }
+    if (value === "domain" && values[0] === "paid") {
+      if (values[1] === "plan") return "domain paid plan";
+      if (values[1] === "apply") return "domain paid apply";
+      if (values[1] === "status") return "domain paid status";
+      if (values[1] === "delete") return "domain paid delete";
+    }
+    if (value === "rollback") return values[0] === "plan" ? "rollback plan" : "rollback";
+    if (value === "deployment" && values[0] === "promote")
+      return values[1] === "plan" ? "deployment promote plan" : "deployment promote";
+    if (value === "deployment" && values[0] === "logs") return "deployment logs";
+    if (value === "deployment" && values[0] === "list") return "deployment list";
+    if (value === "deployment" && values[0] === "get") return "deployment get";
+    if (value === "delete") return values[0] === "plan" ? "delete plan" : "delete";
+    if (value === "secret") {
+      if (values[0] === "list") return "secret list";
+      if (values[0] === "set") return "secret set";
+      if (values[0] === "delete") return "secret delete";
+    }
+    if (value === "auth") return "auth";
+    if (value === "function" && values[0] === "runs") return "function runs";
+    if (value === "mail") {
+      if (["workspace", "binding", "identity"].includes(values[0] ?? "")) {
+        const candidate = `mail ${values[0]} ${values[1]}`;
+        if (SHARED_MAIL_LABELS.includes(candidate as SharedMailCommandLabel))
+          return candidate as SharedMailCommandLabel;
+      }
+      if (values[0] === "setup") return "mail setup";
+      if (values[0] === "status") return "mail status";
+      if (values[0] === "webhook") {
+        if (values[1] === "set") return "mail webhook set";
+        if (values[1] === "verify") return "mail webhook verify";
+        if (values[1] === "disable") return "mail webhook disable";
+        if (values[1] === "rotate") return "mail webhook rotate";
+      }
+      if (values[0] === "messages") {
+        if (values[1] === "list") return "mail messages list";
+        if (values[1] === "get") return "mail messages get";
+        if (values[1] === "retry") return "mail messages retry";
+      }
+    }
+    if (value === "mail" && values[0] === "domain") {
+      if (values[1] === "set") return "mail domain set";
+      if (values[1] === "status") return "mail domain status";
+      if (values[1] === "delete") return "mail domain delete";
+    }
+    return "unknown";
+  }
+  return "unknown";
+};
+
+/** `database schedule runs --limit` is at most 50 entries, the route's own maximum. */
+const SCHEDULE_RUNS_MAX_ITEMS = 50;
+
+export const parseProductCliCommand = (argv: readonly string[]): ProductCliCommand => {
+  const values = [...argv];
+  removeFlag(values, "--json");
+  const help = removeFlag(values, "--help");
+  if ((values.length === 1 && values[0] === "help") || values.length === 0) {
+    return { kind: "help" };
+  }
+  // `help database` is the same request as `database --help`.
+  if (values[0] === "help") return parseProductCliCommand([...values.slice(1), "--help"]);
+  if (help) {
+    // The topic is only checked for shape here; the CLI answers unknown topics with invalid_command.
+    const topic = values.join(" ");
+    if (!/^[a-z][a-z0-9 -]*$/u.test(topic) || topic === "version") throw new InvalidCommandError();
+    return { kind: "help", topic };
+  }
+  if (values.length === 1 && (values[0] === "--version" || values[0] === "version")) {
+    return { kind: "version" };
+  }
+  const dryRun = removeFlag(values, "--dry-run");
+  const credentialStore = "native" as const;
+  const revoke = removeFlag(values, "--revoke");
+  const yes = removeFlag(values, "--yes");
+  const wait = removeFlag(values, "--wait");
+  const follow = removeFlag(values, "--follow");
+  const stdin = removeFlag(values, "--stdin");
+  const first = values.shift();
+  if (first === "auth") {
+    if (dryRun || revoke || yes || wait || follow) throw new InvalidCommandError();
+    const area = values.shift();
+    const action = values.shift();
+    const actionKey = `${area}_${action}`;
+    const options = parseOptionalOptions(values, [
+      "--project",
+      "--environment",
+      "--idempotency-key",
+      "--revision",
+      "--enabled",
+      "--signup-policy",
+      "--application-name",
+      "--canonical-origin",
+      "--allowed-redirect-paths",
+      "--reset-password-path",
+      "--invitation-path",
+      "--provider",
+      "--client-id",
+      "--user",
+      "--email",
+      "--limit",
+      "--cursor",
+      "--search",
+      "--token-user",
+      "--token-organization",
+      "--profile-user",
+      "--profile-organization",
+    ]);
+    const actionOptions: Readonly<Record<string, readonly string[]>> = {
+      config_get: [],
+      config_set: [
+        "--idempotency-key",
+        "--revision",
+        "--enabled",
+        "--signup-policy",
+        "--application-name",
+        "--canonical-origin",
+        "--allowed-redirect-paths",
+        "--reset-password-path",
+        "--invitation-path",
+      ],
+      provider_get: ["--provider"],
+      provider_set: [
+        "--provider",
+        "--idempotency-key",
+        "--revision",
+        "--enabled",
+        "--client-id",
+        "--token-user",
+        "--token-organization",
+        "--profile-user",
+        "--profile-organization",
+      ],
+      users_list: ["--limit", "--cursor", "--search"],
+      user_create: ["--idempotency-key", "--email"],
+      user_get: ["--user"],
+      user_delete: ["--user", "--idempotency-key"],
+      user_invite: ["--user", "--idempotency-key"],
+      user_suspend: ["--user", "--idempotency-key"],
+      user_reactivate: ["--user", "--idempotency-key"],
+      "user_revoke-sessions": ["--user", "--idempotency-key"],
+    };
+    const admittedOptions = actionOptions[actionKey];
+    if (
+      !admittedOptions ||
+      Object.keys(options).some(
+        (key) => key !== "--project" && key !== "--environment" && !admittedOptions.includes(key),
+      )
+    )
+      throw new InvalidCommandError();
+    const projectId = options["--project"],
+      environmentId = options["--environment"];
+    if (!projectId || !environmentId) throw new InvalidCommandError();
+    const scope = { projectId, environmentId };
+    const idempotencyKey = options["--idempotency-key"];
+    const revision = Number(options["--revision"]);
+    const enabled =
+      options["--enabled"] === "true" ? true : options["--enabled"] === "false" ? false : null;
+    const provider = options["--provider"];
+    const userId = options["--user"];
+    let request: NativeAuthCommand;
+    if (actionKey === "config_get") request = { ...scope, action: "config_get" };
+    else if (
+      actionKey === "config_set" &&
+      idempotencyKey &&
+      Number.isSafeInteger(revision) &&
+      revision >= 0 &&
+      enabled !== null &&
+      (options["--signup-policy"] === "open" || options["--signup-policy"] === "invite-only") &&
+      options["--application-name"]
+    ) {
+      const rawPaths = options["--allowed-redirect-paths"];
+      let paths: unknown;
+      if (rawPaths !== undefined) {
+        try {
+          paths = JSON.parse(rawPaths);
+        } catch {
+          throw new InvalidCommandError();
+        }
+        if (
+          !Array.isArray(paths) ||
+          paths.length < 1 ||
+          paths.length > 16 ||
+          !paths.every(isNativeAuthRedirectPath) ||
+          new Set(paths).size !== paths.length
+        )
+          throw new InvalidCommandError();
+      }
+      for (const path of [options["--reset-password-path"], options["--invitation-path"]]) {
+        if (
+          path !== undefined &&
+          (!isNativeAuthRedirectPath(path) || (Array.isArray(paths) && !paths.includes(path)))
+        )
+          throw new InvalidCommandError();
+      }
+      const origin = options["--canonical-origin"];
+      if (origin !== undefined && origin !== "primary") {
+        try {
+          const url = new URL(origin);
+          if (url.protocol !== "https:" || url.origin !== origin || url.username || url.password)
+            throw new InvalidCommandError();
+        } catch {
+          throw new InvalidCommandError();
+        }
+      }
+      request = {
+        ...scope,
+        action: "config_set",
+        idempotencyKey,
+        configurationRevision: revision,
+        enabled,
+        signupPolicy: options["--signup-policy"],
+        applicationName: options["--application-name"],
+        ...(options["--canonical-origin"] === undefined
+          ? {}
+          : {
+              canonicalOrigin:
+                options["--canonical-origin"] === "primary" ? null : options["--canonical-origin"],
+            }),
+        ...(paths === undefined ? {} : { allowedRedirectPaths: paths as string[] }),
+        ...(options["--reset-password-path"] === undefined
+          ? {}
+          : { resetPasswordPath: options["--reset-password-path"] }),
+        ...(options["--invitation-path"] === undefined
+          ? {}
+          : { invitationPath: options["--invitation-path"] }),
+      };
+    } else if (actionKey === "provider_get" && (provider === "google" || provider === "github"))
+      request = { ...scope, action: "provider_get", provider };
+    else if (
+      actionKey === "provider_set" &&
+      idempotencyKey &&
+      Number.isSafeInteger(revision) &&
+      revision >= 0 &&
+      enabled !== null &&
+      (provider === "google" || provider === "github")
+    )
+      request = {
+        ...scope,
+        action: "provider_set",
+        provider,
+        idempotencyKey,
+        configurationRevision: revision,
+        enabled,
+        ...(options["--client-id"] ? { clientId: options["--client-id"] } : {}),
+      };
+    else if (actionKey === "users_list") {
+      const limit = options["--limit"] === undefined ? undefined : decimalLimit(options["--limit"]);
+      if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > 100))
+        throw new InvalidCommandError();
+      request = {
+        ...scope,
+        action: "users_list",
+        ...(limit === undefined ? {} : { limit }),
+        ...(options["--cursor"] ? { cursor: options["--cursor"] } : {}),
+        ...(options["--search"] ? { search: options["--search"] } : {}),
+      };
+    } else if (actionKey === "user_create" && idempotencyKey && options["--email"])
+      request = { ...scope, action: "user_create", idempotencyKey, email: options["--email"] };
+    else if (actionKey === "user_get" && userId) request = { ...scope, action: "user_get", userId };
+    else if (
+      idempotencyKey &&
+      userId &&
+      [
+        "user_delete",
+        "user_invite",
+        "user_suspend",
+        "user_reactivate",
+        "user_revoke-sessions",
+      ].includes(actionKey)
+    )
+      request = {
+        ...scope,
+        action: (actionKey === "user_revoke-sessions" ? "user_revoke_sessions" : actionKey) as
+          | "user_delete"
+          | "user_invite"
+          | "user_suspend"
+          | "user_reactivate"
+          | "user_revoke_sessions",
+        userId,
+        idempotencyKey,
+      };
+    else throw new InvalidCommandError();
+    if (stdin && request.action !== "provider_set") throw new InvalidCommandError();
+    const environmentToken = handedAccount(
+      options["--token-user"],
+      options["--token-organization"],
+    );
+    const profileAccount = handedAccount(
+      options["--profile-user"],
+      options["--profile-organization"],
+    );
+    if (environmentToken && profileAccount) throw new InvalidCommandError();
+    return {
+      kind: "native-auth",
+      request,
+      stdin,
+      credentialStore,
+      ...(environmentToken ? { environmentToken } : {}),
+      ...(profileAccount ? { profileAccount } : {}),
+    };
+  }
+  if (first === "source" && values[0] !== "auto-deploy") {
+    if (dryRun || revoke || yes || follow || stdin) throw new InvalidCommandError();
+    return parseSourceCommand(values, wait);
+  }
+  if (
+    first === "whoami" &&
+    !dryRun &&
+    !revoke &&
+    !yes &&
+    !wait &&
+    !follow &&
+    !stdin &&
+    values.length === 0
+  ) {
+    return { kind: "whoami", credentialStore };
+  }
+  if (first === "init") {
+    if (revoke || yes || wait || follow || stdin) throw new InvalidCommandError();
+    const options = parseOptionalOptions(values, [
+      "--directory",
+      "--project",
+      "--root",
+      "--region",
+    ]);
+    const region = options["--region"];
+    if (region !== undefined && region !== "us" && region !== "eu") throw new InvalidCommandError();
+    return {
+      kind: "init",
+      directory: options["--directory"] ?? ".",
+      project: options["--project"],
+      root: options["--root"],
+      ...(region === undefined ? {} : { region }),
+      dryRun,
+    };
+  }
+  if (dryRun) throw new InvalidCommandError();
+  if (first === "login" && !revoke && !yes && !wait && !follow && !stdin) {
+    const options = parseOptionalOptions(values, ["--organization", "--user"]);
+    const organizationId = options["--organization"];
+    const userId = options["--user"];
+    if (
+      (organizationId !== undefined && !ORGANIZATION_ULID.test(organizationId)) ||
+      (userId !== undefined && !isProfileUserId(userId))
+    )
+      throw new InvalidCommandError();
+    return {
+      kind: "login",
+      ...(organizationId === undefined ? {} : { organizationId }),
+      ...(userId === undefined ? {} : { userId }),
+      credentialStore,
+    };
+  }
+  if (
+    first === "profile" &&
+    values.length === 1 &&
+    values[0] === "list" &&
+    !revoke &&
+    !yes &&
+    !wait &&
+    !follow &&
+    !stdin
+  )
+    return { kind: "profile-list" };
+  if (first === "logout") {
+    if (!yes && !wait && !follow && !stdin && values.length === 0)
+      return { kind: "logout", revoke, credentialStore };
+  }
+  if (revoke) throw new InvalidCommandError();
+  if (first === "token") {
+    if (wait || follow || stdin) throw new InvalidCommandError();
+    const sub = values.shift();
+    const options = parseOptionalOptions(
+      values,
+      sub === "create"
+        ? ["--organization", "--name", "--idempotency-key", "--out"]
+        : sub === "list"
+          ? ["--organization", "--after"]
+          : ["--organization", "--key"],
+    );
+    const organizationId = options["--organization"];
+    if (!organizationId || !/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/u.test(organizationId))
+      throw new InvalidCommandError();
+    if (sub === "create" && !yes) {
+      const name = options["--name"],
+        idempotencyKey = options["--idempotency-key"],
+        outputPath = options["--out"];
+      if (
+        !name ||
+        name.trim() !== name ||
+        name.length > 64 ||
+        /\p{Cc}/u.test(name) ||
+        !idempotencyKey ||
+        !IDEMPOTENCY_KEY.test(idempotencyKey) ||
+        !outputPath
+      )
+        throw new InvalidCommandError();
+      return {
+        kind: "token-create",
+        organizationId,
+        name,
+        idempotencyKey,
+        outputPath,
+        credentialStore,
+      };
+    }
+    if (sub === "list" && !yes) {
+      const after = options["--after"];
+      if (after !== undefined && !USER_API_KEY_ID.test(after)) throw new InvalidCommandError();
+      return {
+        kind: "token-list",
+        organizationId,
+        ...(after === undefined ? {} : { after }),
+        credentialStore,
+      };
+    }
+    if (sub === "revoke" && yes && options["--key"] && USER_API_KEY_ID.test(options["--key"]))
+      return { kind: "token-revoke", organizationId, keyId: options["--key"], credentialStore };
+    throw new InvalidCommandError();
+  }
+  if (first === "feedback" && values[0] === "status") {
+    values.shift();
+    const feedbackId = values.shift();
+    if (yes || wait || follow || stdin || !isValue(feedbackId)) throw new InvalidCommandError();
+    const cursor = parseOptionalOptions(values, ["--cursor"])["--cursor"];
+    return {
+      kind: "feedback-status",
+      feedbackId,
+      ...(cursor === undefined ? {} : { cursor }),
+      credentialStore,
+    };
+  }
+  if (first === "feedback" && values.shift() === "submit") {
+    if (yes || wait || follow || stdin) throw new InvalidCommandError();
+    const options = parseOptionalOptions(values, [
+      "--organization",
+      "--kind",
+      "--title",
+      "--description",
+      "--project",
+      "--environment",
+      "--operation",
+      "--error-code",
+      "--client-version",
+      "--idempotency-key",
+    ]);
+    const organization = options["--organization"],
+      kind = options["--kind"],
+      title = options["--title"],
+      description = options["--description"],
+      key = options["--idempotency-key"];
+    if (
+      !organization ||
+      !title ||
+      !description ||
+      !key ||
+      (kind !== "bug" && kind !== "issue" && kind !== "feature_request")
+    )
+      throw new InvalidCommandError();
+    return {
+      kind: "feedback-submit",
+      credentialStore,
+      idempotencyKey: key,
+      report: {
+        organization_id: organization,
+        kind,
+        title,
+        description,
+        ...(options["--project"] === undefined ? {} : { project_id: options["--project"] }),
+        ...(options["--environment"] === undefined
+          ? {}
+          : { environment_id: options["--environment"] }),
+        ...(options["--operation"] === undefined ? {} : { operation_id: options["--operation"] }),
+        ...(options["--error-code"] === undefined ? {} : { error_code: options["--error-code"] }),
+        ...(options["--client-version"] === undefined
+          ? {}
+          : { client_version: options["--client-version"] }),
+      },
+    };
+  }
+  if (first === "billing") {
+    if (yes || wait || follow || stdin) throw new InvalidCommandError();
+    const sub = values.shift();
+    if (sub === "recharge") {
+      const action = values.shift();
+      if (action === "get") {
+        const o = parseOptions(values, ["--organization"]);
+        return {
+          kind: "billing-recharge-get",
+          organizationId: o["--organization"],
+          credentialStore,
+        };
+      }
+      if (action !== "set") throw new InvalidCommandError();
+      const o = parseOptionalOptions(values, [
+        "--organization",
+        "--enabled",
+        "--monthly-limit-minor",
+        "--consent",
+        "--revision",
+        "--idempotency-key",
+      ]);
+      const limit = Number(o["--monthly-limit-minor"]),
+        revision = Number(o["--revision"]);
+      if (
+        !o["--organization"] ||
+        !o["--idempotency-key"] ||
+        !["true", "false"].includes(o["--enabled"] ?? "") ||
+        !Number.isSafeInteger(limit) ||
+        limit < 1000 ||
+        limit > 100000 ||
+        !o["--revision"] ||
+        !Number.isSafeInteger(revision) ||
+        revision < 0 ||
+        (o["--enabled"] === "true"
+          ? o["--consent"] !== "off_session_v1"
+          : o["--consent"] !== undefined)
+      )
+        throw new InvalidCommandError();
+      return {
+        kind: "billing-recharge-set",
+        organizationId: o["--organization"],
+        enabled: o["--enabled"] === "true",
+        monthlyLimitMinor: limit,
+        consent: o["--enabled"] === "true" ? "off_session_v1" : null,
+        revision,
+        idempotencyKey: o["--idempotency-key"],
+        credentialStore,
+      };
+    }
+    if (sub === "portal") {
+      const options = parseOptions(values, ["--organization"]);
+      return { kind: "billing-portal", organizationId: options["--organization"], credentialStore };
+    }
+    if (sub === "status") {
+      const options = parseOptions(values, ["--organization", "--checkout"]);
+      return {
+        kind: "billing-status",
+        organizationId: options["--organization"],
+        checkoutId: options["--checkout"],
+        credentialStore,
+      };
+    }
+    if (sub === "checkout") {
+      const options = parseOptionalOptions(values, [
+          "--organization",
+          "--offer",
+          "--packs",
+          "--idempotency-key",
+        ]),
+        offer = options["--offer"],
+        packs = Number(options["--packs"] ?? "1");
+      if (
+        !options["--organization"] ||
+        !options["--idempotency-key"] ||
+        (offer !== "topup" && offer !== "paid") ||
+        !/^[1-9][0-9]{0,2}$/u.test(options["--packs"] ?? "1") ||
+        packs > 100 ||
+        (offer === "paid" && packs !== 1)
+      )
+        throw new InvalidCommandError();
+      return {
+        kind: "billing-checkout",
+        organizationId: options["--organization"],
+        offer,
+        packs,
+        idempotencyKey: options["--idempotency-key"],
+        credentialStore,
+      };
+    }
+    throw new InvalidCommandError();
+  }
+  if (first === "credits" && values[0] === "usage") {
+    values.shift();
+    if (yes || wait || follow || stdin) throw new InvalidCommandError();
+    const options = parseOptions(values, ["--organization"]);
+    return { kind: "credits-usage", organizationId: options["--organization"], credentialStore };
+  }
+  if (first === "credits" && values[0] === "account") {
+    values.shift();
+    if (yes || wait || follow || stdin) throw new InvalidCommandError();
+    const options = parseOptions(values, ["--organization"]);
+    return { kind: "credits-account", organizationId: options["--organization"], credentialStore };
+  }
+  if (first === "referral" && values[0] === "link") {
+    values.shift();
+    if (yes || wait || follow || stdin) throw new InvalidCommandError();
+    const options = parseOptions(values, ["--organization"]);
+    return { kind: "referral-link", organizationId: options["--organization"], credentialStore };
+  }
+  if (first === "credits" && values.shift() === "balance") {
+    if (yes || wait || follow || stdin) throw new InvalidCommandError();
+    const options = parseOptions(values, ["--organization"]);
+    return { kind: "credits-balance", organizationId: options["--organization"], credentialStore };
+  }
+  if (first === "budget") {
+    const subcommand = values.shift();
+    if (yes || wait || follow || stdin) throw new InvalidCommandError();
+    if (subcommand === "get")
+      return {
+        kind: "budget-get",
+        projectId: parseOptions(values, ["--project"])["--project"],
+        credentialStore,
+      };
+    if (subcommand !== "set") throw new InvalidCommandError();
+    const options = parseOptionalOptions(values, [
+      "--project",
+      "--credits",
+      "--mode",
+      "--idempotency-key",
+    ]);
+    const projectId = options["--project"];
+    const value = options["--credits"];
+    const mode = options["--mode"] ?? "continue";
+    const idempotencyKey = options["--idempotency-key"];
+    if (
+      !isValue(projectId) ||
+      !isValue(value) ||
+      !isValue(idempotencyKey) ||
+      (mode !== "continue" && mode !== "stop")
+    )
+      throw new InvalidCommandError();
+    if (value === "none") {
+      if (mode !== "continue") throw new InvalidCommandError();
+      return {
+        kind: "budget-set",
+        projectId,
+        amountMicros: null,
+        mode,
+        idempotencyKey,
+        credentialStore,
+      };
+    }
+    if (!/^(0|[1-9][0-9]{0,12})(\.[0-9]{1,6})?$/u.test(value)) throw new InvalidCommandError();
+    const [whole, fraction = ""] = value.split(".");
+    const amount = BigInt(whole ?? "0") * 1_000_000n + BigInt(fraction.padEnd(6, "0"));
+    if (amount > 9007199254740991n) throw new InvalidCommandError();
+    return {
+      kind: "budget-set",
+      projectId,
+      amountMicros: amount.toString(),
+      mode,
+      idempotencyKey,
+      credentialStore,
+    };
+  }
+  if (first === "operation") {
+    const subcommand = values.shift();
+    if (subcommand === "get") {
+      if (yes || wait || follow || stdin) throw new InvalidCommandError();
+      const operationId = values.shift();
+      if (isValue(operationId) && values.length === 0) {
+        return { kind: "operation-get", operationId, credentialStore };
+      }
+    }
+    if (subcommand === "reconcile") {
+      if (!yes || wait || follow || stdin) throw new InvalidCommandError();
+      const operationId = values.shift();
+      if (!isValue(operationId)) throw new InvalidCommandError();
+      const options = parseOptions(values, ["--idempotency-key"]);
+      return {
+        kind: "operation-reconcile",
+        operationId,
+        idempotencyKey: options["--idempotency-key"],
+        yes,
+        credentialStore,
+      };
+    }
+    throw new InvalidCommandError();
+  }
+  if (first === "github") {
+    const subcommand = values.shift();
+    if (wait || follow || stdin) throw new InvalidCommandError();
+    if (subcommand !== "connect" && subcommand !== "status" && subcommand !== "disconnect")
+      throw new InvalidCommandError();
+    // Only disconnecting is destructive, and it requires --yes; the route reads no idempotency key.
+    if (yes !== (subcommand === "disconnect")) throw new InvalidCommandError();
+    const options = parseOptions(
+      values,
+      subcommand === "connect" ? ["--organization", "--idempotency-key"] : ["--organization"],
+    );
+    const organizationId = options["--organization"];
+    if (!ORGANIZATION_ULID.test(organizationId)) throw new InvalidCommandError();
+    if (subcommand === "disconnect")
+      return { kind: "github-disconnect", organizationId, yes: true, credentialStore };
+    return subcommand === "connect"
+      ? {
+          kind: "github-connect",
+          organizationId,
+          idempotencyKey: options["--idempotency-key"],
+          credentialStore,
+        }
+      : { kind: "github-status", organizationId, credentialStore };
+  }
+  if (first === "connection") {
+    const operation = values.shift();
+    if (wait || follow || stdin || yes !== (operation === "disconnect"))
+      throw new InvalidCommandError();
+    const options = parseOptionalOptions(values, [
+      "--organization",
+      "--project",
+      "--environment",
+      "--grant",
+      "--request",
+      "--idempotency-key",
+      "--provider-organization",
+      "--team",
+      "--connection",
+    ] as const);
+    const org = options["--organization"];
+    if (!org || !ORGANIZATION_ULID.test(org)) throw new InvalidCommandError();
+    const exact = (names: string[]) =>
+      Object.keys(options).every((k) => names.includes(k)) &&
+      names.every((k) => Object.hasOwn(options, k));
+    const scoped = () =>
+      options["--project"] &&
+      options["--environment"] &&
+      ORGANIZATION_ULID.test(options["--project"]) &&
+      ORGANIZATION_ULID.test(options["--environment"]);
+    if (operation === "list" && exact(["--organization"]))
+      return { kind: "connection-list", organizationId: org, credentialStore };
+    if (
+      operation === "begin" &&
+      (exact(["--organization", "--idempotency-key"]) ||
+        (scoped() && exact(["--organization", "--project", "--environment", "--idempotency-key"])))
+    )
+      return {
+        kind: "connection-begin",
+        organizationId: org,
+        ...(options["--project"]
+          ? { projectId: options["--project"], environmentId: options["--environment"] }
+          : {}),
+        idempotencyKey: options["--idempotency-key"] ?? "",
+        credentialStore,
+      };
+    if (
+      operation === "status" &&
+      exact(["--organization", "--request"]) &&
+      /^[a-f0-9]{64}$/u.test(options["--request"] ?? "")
+    )
+      return {
+        kind: "connection-status",
+        organizationId: org,
+        requestId: options["--request"] ?? "",
+        credentialStore,
+      };
+    if (
+      operation === "disconnect" &&
+      exact(["--organization", "--grant", "--idempotency-key"]) &&
+      ORGANIZATION_ULID.test(options["--grant"] ?? "")
+    )
+      return {
+        kind: "connection-disconnect",
+        organizationId: org,
+        grantId: options["--grant"] ?? "",
+        idempotencyKey: options["--idempotency-key"] ?? "",
+        yes: true,
+        credentialStore,
+      };
+    if (
+      operation === "import" &&
+      scoped() &&
+      ORGANIZATION_ULID.test(options["--grant"] ?? "") &&
+      exact([
+        "--organization",
+        "--project",
+        "--environment",
+        "--grant",
+        "--provider-organization",
+        "--team",
+        "--connection",
+        "--idempotency-key",
+      ])
+    ) {
+      const projectId = options["--project"],
+        environmentId = options["--environment"],
+        grantId = options["--grant"],
+        idempotencyKey = options["--idempotency-key"];
+      const providerOrganizationId = Number(options["--provider-organization"]),
+        teamId = Number(options["--team"]),
+        connectionId = Number(options["--connection"]);
+      if (
+        !projectId ||
+        !environmentId ||
+        !grantId ||
+        !idempotencyKey ||
+        [providerOrganizationId, teamId, connectionId].some(
+          (n) => !Number.isSafeInteger(n) || n < 1,
+        )
+      )
+        throw new InvalidCommandError();
+      return {
+        kind: "connection-import",
+        organizationId: org,
+        projectId,
+        environmentId,
+        grantId,
+        providerOrganizationId,
+        teamId,
+        connectionId,
+        idempotencyKey,
+        credentialStore,
+      };
+    }
+    if (
+      operation === "discover" &&
+      ((!options["--project"] && !options["--environment"]) || scoped()) &&
+      ORGANIZATION_ULID.test(options["--grant"] ?? "") &&
+      Object.keys(options).every((k) =>
+        [
+          "--organization",
+          "--project",
+          "--environment",
+          "--grant",
+          "--provider-organization",
+          "--team",
+        ].includes(k),
+      )
+    ) {
+      const number = (v: string | undefined) =>
+        v && /^[1-9][0-9]{0,14}$/u.test(v) && Number.isSafeInteger(Number(v))
+          ? Number(v)
+          : undefined;
+      const providerOrganizationId = number(options["--provider-organization"]),
+        teamId = number(options["--team"]);
+      if (
+        (options["--provider-organization"] && !providerOrganizationId) ||
+        (options["--team"] && (!teamId || !providerOrganizationId))
+      )
+        throw new InvalidCommandError();
+      return {
+        kind: "connection-discover",
+        organizationId: org,
+        ...(options["--project"]
+          ? { projectId: options["--project"], environmentId: options["--environment"] }
+          : {}),
+        grantId: options["--grant"] ?? "",
+        ...(providerOrganizationId ? { providerOrganizationId } : {}),
+        ...(teamId ? { teamId } : {}),
+        credentialStore,
+      };
+    }
+    throw new InvalidCommandError();
+  }
+  if (first === "organization" && values[0] === "mcp-connections") {
+    values.shift();
+    const subcommand = values.shift();
+    if (wait || follow || stdin) throw new InvalidCommandError();
+    // Only disconnecting a client is destructive, and it requires --yes; the route reads no key.
+    if (yes !== (subcommand === "revoke")) throw new InvalidCommandError();
+    if (subcommand === "list") {
+      const organizationId = parseOptions(values, ["--organization"])["--organization"];
+      if (!ORGANIZATION_ULID.test(organizationId)) throw new InvalidCommandError();
+      return { kind: "organization-mcp-connections-list", organizationId, credentialStore };
+    }
+    if (subcommand === "revoke") {
+      const options = parseOptions(values, ["--organization", "--connection"]);
+      const organizationId = options["--organization"];
+      const connectionId = options["--connection"];
+      if (!ORGANIZATION_ULID.test(organizationId) || !MCP_CONNECTION_ID_PATTERN.test(connectionId))
+        throw new InvalidCommandError();
+      return {
+        kind: "organization-mcp-connection-revoke",
+        organizationId,
+        connectionId,
+        yes: true,
+        credentialStore,
+      };
+    }
+    throw new InvalidCommandError();
+  }
+  if (first === "organization") {
+    const subcommand = values.shift();
+    if (yes || wait || follow || stdin) throw new InvalidCommandError();
+    if (subcommand === "create") {
+      const options = parseOptionalOptions(values, ["--name", "--source", "--idempotency-key"]);
+      const name = options["--name"];
+      const idempotencyKey = options["--idempotency-key"];
+      // Signup is open: the source is optional attribution, the other two are required.
+      if (!isValue(name) || !isValue(idempotencyKey)) throw new InvalidCommandError();
+      const signupSource = options["--source"];
+      if (signupSource !== undefined && !isValue(signupSource)) throw new InvalidCommandError();
+      return {
+        kind: "organization-create",
+        ...(signupSource === undefined ? {} : { signupSource }),
+        name,
+        idempotencyKey,
+        credentialStore,
+      };
+    }
+    if (subcommand === "list") {
+      if (values.length > 0) throw new InvalidCommandError();
+      return { kind: "organization-list", credentialStore };
+    }
+    if (subcommand === "use") {
+      const organizationId = parseOptions(values, ["--organization"])["--organization"];
+      if (!ORGANIZATION_ULID.test(organizationId)) throw new InvalidCommandError();
+      return { kind: "organization-use", organizationId, credentialStore };
+    }
+    throw new InvalidCommandError();
+  }
+  if (first === "project") {
+    const subcommand = values.shift();
+    if (subcommand === "dev" && values.shift() === "add") {
+      if (yes || wait || follow || stdin) throw new InvalidCommandError();
+      const options = parseOptions(values, ["--project", "--idempotency-key"]);
+      return {
+        kind: "project-development-add",
+        projectId: options["--project"],
+        idempotencyKey: options["--idempotency-key"],
+        credentialStore,
+      };
+    }
+    if (subcommand === "data") {
+      const action = values.shift();
+      if (follow || stdin || (action !== "plan" && action !== "change"))
+        throw new InvalidCommandError();
+      if ((action === "plan" && (yes || wait)) || (action === "change" && !yes))
+        throw new InvalidCommandError();
+      const options = parseOptions(
+        values,
+        action === "plan"
+          ? ["--project", "--change"]
+          : ["--project", "--change", "--if-match", "--confirmation-token", "--idempotency-key"],
+      );
+      const change = options["--change"];
+      if (!isProjectDataChangeKind(change)) throw new InvalidCommandError();
+      const common = { projectId: options["--project"], change, credentialStore };
+      return action === "plan"
+        ? { kind: "project-data-plan", ...common }
+        : {
+            kind: "project-data-change",
+            ...common,
+            ifMatch: options["--if-match"],
+            confirmationToken: options["--confirmation-token"],
+            idempotencyKey: options["--idempotency-key"],
+            yes: true,
+            wait,
+          };
+    }
+    if (subcommand === "handle" && values[0] === "set") {
+      values.shift();
+      if (yes || wait || follow || stdin) throw new InvalidCommandError();
+      const options = parseOptions(values, [
+        "--project",
+        "--handle",
+        "--if-match",
+        "--idempotency-key",
+      ]);
+      return {
+        kind: "project-handle-set",
+        projectId: options["--project"],
+        handle: options["--handle"],
+        ifMatch: options["--if-match"],
+        idempotencyKey: options["--idempotency-key"],
+        credentialStore,
+      };
+    }
+    if (subcommand === "handle" && values.shift() === "check") {
+      if (yes || wait || follow || stdin) throw new InvalidCommandError();
+      const options = parseOptions(values, ["--handle"]);
+      return { kind: "project-handle-check", handle: options["--handle"], credentialStore };
+    }
+    if (subcommand === "preview") {
+      const action = values.shift();
+      if (
+        !action ||
+        !["get", "open", "stop", "rotate"].includes(action) ||
+        wait ||
+        follow ||
+        stdin ||
+        (action === "stop" || action === "rotate") !== yes
+      )
+        throw new InvalidCommandError();
+      const changing = action === "stop" || action === "rotate";
+      const options = parseOptions(
+        values,
+        changing
+          ? ["--project", "--environment", "--idempotency-key"]
+          : ["--project", "--environment"],
+      );
+      const environment = options["--environment"];
+      if (environment !== "dev" && environment !== "prod") throw new InvalidCommandError();
+      if (changing)
+        return {
+          kind: action === "stop" ? "project-preview-stop" : "project-preview-rotate",
+          projectId: options["--project"],
+          environment,
+          idempotencyKey: options["--idempotency-key"],
+          credentialStore,
+        };
+      return {
+        kind: action === "get" ? "project-preview-get" : "project-preview-open",
+        projectId: options["--project"],
+        environment,
+        credentialStore,
+      };
+    }
+    if (subcommand === "dev-share") {
+      const action = values.shift();
+      if (action === "link") {
+        if (yes || wait || follow || stdin) throw new InvalidCommandError();
+        const options = parseOptions(values, ["--project"]);
+        return { kind: "project-dev-share-link", projectId: options["--project"], credentialStore };
+      }
+      if ((action === "rotate" || action === "revoke") && yes && !wait && !follow && !stdin) {
+        const options = parseOptions(values, ["--project", "--idempotency-key"]);
+        return {
+          kind: action === "rotate" ? "project-dev-share-rotate" : "project-dev-share-revoke",
+          projectId: options["--project"],
+          idempotencyKey: options["--idempotency-key"],
+          credentialStore,
+        };
+      }
+      throw new InvalidCommandError();
+    }
+    if (subcommand === "dev-access" && values[0] === "mode") {
+      values.shift();
+      if (!yes || wait || follow || stdin) throw new InvalidCommandError();
+      const options = parseOptions(values, ["--project", "--mode", "--idempotency-key"]);
+      if (options["--mode"] !== "protected" && options["--mode"] !== "public")
+        throw new InvalidCommandError();
+      return {
+        kind: "project-dev-access-mode-set",
+        projectId: options["--project"],
+        mode: options["--mode"],
+        idempotencyKey: options["--idempotency-key"],
+        credentialStore,
+      };
+    }
+    if (subcommand === "flag") {
+      const action = values.shift();
+      if (yes || wait || follow || stdin) throw new InvalidCommandError();
+      if (action === "status") {
+        const options = parseOptions(values, ["--project"]);
+        return { kind: "project-flag-status", projectId: options["--project"], credentialStore };
+      }
+      if (action === "set") {
+        const options = parseOptions(values, ["--project", "--enabled", "--idempotency-key"]);
+        if (options["--enabled"] !== "true" && options["--enabled"] !== "false")
+          throw new InvalidCommandError();
+        return {
+          kind: "project-flag-set",
+          projectId: options["--project"],
+          enabled: options["--enabled"] === "true",
+          idempotencyKey: options["--idempotency-key"],
+          credentialStore,
+        };
+      }
+      throw new InvalidCommandError();
+    }
+    if (subcommand === "dev-access" && values.shift() === "create") {
+      if (yes || wait || follow || stdin) throw new InvalidCommandError();
+      const options = parseOptions(values, ["--project"]);
+      return {
+        kind: "project-dev-access-create",
+        projectId: options["--project"],
+        credentialStore,
+      };
+    }
+    if (subcommand === "list") {
+      if (yes || wait || follow || stdin) throw new InvalidCommandError();
+      const options = parseOptionalOptions(values, ["--cursor", "--limit"]);
+      const limit = options["--limit"] === undefined ? 50 : decimalLimit(options["--limit"]);
+      if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+        throw new InvalidCommandError();
+      }
+      return {
+        kind: "project-list",
+        cursor: options["--cursor"],
+        limit,
+        credentialStore,
+      };
+    }
+    if (subcommand === "context") {
+      if (yes || wait || follow || stdin) throw new InvalidCommandError();
+      const options = parseOptions(values, ["--project"]);
+      return { kind: "project-context", projectId: options["--project"], credentialStore };
+    }
+    if (subcommand === "notes" && values.shift() === "set") {
+      if (yes || wait || follow || stdin) throw new InvalidCommandError();
+      const textIndex = values.indexOf("--markdown");
+      const markdown = values[textIndex + 1];
+      if (textIndex < 0 || markdown === undefined) throw new InvalidCommandError();
+      values.splice(textIndex, 2);
+      const options = parseOptions(values, ["--project", "--version", "--idempotency-key"]);
+      if (
+        !/^(?:0|[1-9][0-9]*)$/u.test(options["--version"]) ||
+        Number(options["--version"]) >= 2147483647
+      )
+        throw new InvalidCommandError();
+      return {
+        kind: "project-notes-set",
+        projectId: options["--project"],
+        markdown,
+        expectedVersion: Number(options["--version"]),
+        idempotencyKey: options["--idempotency-key"],
+        credentialStore,
+      };
+    }
+    if (subcommand === "status") {
+      if (yes || wait || follow || stdin) throw new InvalidCommandError();
+      const options = parseOptions(values, ["--project"]);
+      return { kind: "project-status", projectId: options["--project"], credentialStore };
+    }
+    if (subcommand !== "create") throw new InvalidCommandError();
+    if (yes || wait || follow || stdin) throw new InvalidCommandError();
+    const options = parseOptionalOptions(values, [
+      "--organization",
+      "--name",
+      "--idempotency-key",
+      "--data-mode",
+      "--dev-access-mode",
+      "--include-development-environment",
+      "--region",
+    ]);
+    const dataMode = options["--data-mode"];
+    const devAccessMode = options["--dev-access-mode"];
+    const includeDevelopmentEnvironment = options["--include-development-environment"];
+    const region = options["--region"];
+    if (
+      !options["--organization"] ||
+      !options["--name"] ||
+      !options["--idempotency-key"] ||
+      (dataMode !== undefined && dataMode !== "shared" && dataMode !== "isolated") ||
+      (devAccessMode !== undefined &&
+        devAccessMode !== "protected" &&
+        devAccessMode !== "public") ||
+      (includeDevelopmentEnvironment !== undefined &&
+        includeDevelopmentEnvironment !== "true" &&
+        includeDevelopmentEnvironment !== "false") ||
+      (region !== undefined && region !== "us" && region !== "eu")
+    )
+      throw new InvalidCommandError();
+    return {
+      kind: "project-create",
+      organizationId: options["--organization"],
+      name: options["--name"],
+      ...(dataMode === undefined ? {} : { dataMode }),
+      ...(devAccessMode === undefined ? {} : { devAccessMode }),
+      ...(includeDevelopmentEnvironment === undefined
+        ? {}
+        : { includeDevelopmentEnvironment: includeDevelopmentEnvironment === "true" }),
+      ...(region === undefined ? {} : { region }),
+      idempotencyKey: options["--idempotency-key"],
+      credentialStore,
+    };
+  }
+  if (first === "database" && values[0] === "compute" && values[1] === "set") {
+    values.splice(0, 2);
+    if (!yes || follow || stdin || revoke) throw new InvalidCommandError();
+    const options = parseOptionalOptions(values, [
+      "--project",
+      "--environment",
+      "--profile",
+      "--memory-mib",
+      "--idempotency-key",
+    ]);
+    if (
+      !options["--project"] ||
+      !options["--idempotency-key"] ||
+      (options["--profile"] === undefined) === (options["--memory-mib"] === undefined) ||
+      (options["--profile"] !== undefined &&
+        options["--profile"] !== "standard" &&
+        options["--profile"] !== "performance") ||
+      (options["--environment"] !== "dev" && options["--environment"] !== "prod")
+    )
+      throw new InvalidCommandError();
+    let selection: DatabaseComputeSelection;
+    if (options["--memory-mib"] !== undefined) {
+      if (!/^(256|512|1024|2048|4096)$/u.test(options["--memory-mib"]))
+        throw new InvalidCommandError();
+      selection = { memoryMiB: databaseSizeForMemory(Number(options["--memory-mib"])).memoryMiB };
+    } else selection = { profile: options["--profile"] as "standard" | "performance" };
+    return {
+      kind: "database-compute-set",
+      projectId: options["--project"],
+      environment: options["--environment"],
+      ...selection,
+      idempotencyKey: options["--idempotency-key"],
+      wait,
+      credentialStore,
+    };
+  }
+  if (first === "database" && values[0] === "compute" && values[1] === "get") {
+    values.splice(0, 2);
+    if (yes || wait || follow || stdin || revoke) throw new InvalidCommandError();
+    const options = parseOptionalOptions(values, ["--project", "--environment"]);
+    if (!options["--project"]) throw new InvalidCommandError();
+    const environment = options["--environment"] ?? "dev";
+    if (environment !== "dev" && environment !== "prod") throw new InvalidCommandError();
+    return {
+      kind: "database-compute-get",
+      projectId: options["--project"],
+      environment,
+      credentialStore,
+    };
+  }
+  if (first === "database" && values[0] === "write") {
+    values.shift();
+    if (!yes || wait || follow || revoke || stdin) throw new InvalidCommandError();
+    const options = parseOptionalOptions(values, [
+      "--project",
+      "--environment",
+      "--statement-file",
+      "--parameters-json",
+      "--idempotency-key",
+    ]);
+    const projectId = options["--project"],
+      environment = options["--environment"],
+      statementFile = options["--statement-file"],
+      idempotencyKey = options["--idempotency-key"];
+    if (
+      !isValue(projectId) ||
+      !isValue(statementFile) ||
+      !isValue(idempotencyKey) ||
+      (environment !== "dev" && environment !== "prod")
+    )
+      throw new InvalidCommandError();
+    let parameters: unknown;
+    try {
+      parameters = JSON.parse(options["--parameters-json"] ?? "[]");
+    } catch {
+      throw new InvalidCommandError();
+    }
+    if (!Array.isArray(parameters) || parameters.length > 100) throw new InvalidCommandError();
+    return {
+      kind: "database-write",
+      projectId,
+      environment,
+      statementFile,
+      parameters,
+      idempotencyKey,
+      yes: true,
+      credentialStore,
+    };
+  }
+  if (first === "database" && values[0] === "access") {
+    values.shift();
+    const subcommand = values.shift();
+    if (subcommand === "create") {
+      if (!yes || wait || follow || revoke || stdin) throw new InvalidCommandError();
+      const options = parseOptionalOptions(values, [
+        "--project",
+        "--environment",
+        "--mode",
+        "--ttl",
+        "--label",
+      ]);
+      const projectId = options["--project"],
+        environment = options["--environment"],
+        mode = options["--mode"] ?? "read";
+      if (
+        !isValue(projectId) ||
+        (environment !== "dev" && environment !== "prod") ||
+        (mode !== "read" && mode !== "write")
+      )
+        throw new InvalidCommandError();
+      const label = options["--label"];
+      if (label !== undefined && (label.trim() !== label || label.length < 1 || label.length > 64))
+        throw new InvalidCommandError();
+      return {
+        kind: "database-access-create",
+        projectId,
+        environment,
+        mode,
+        ttlSeconds: accessTtlSeconds(options["--ttl"]),
+        label: label ?? null,
+        yes: true,
+        credentialStore,
+      };
+    }
+    if (subcommand === "list") {
+      if (yes || wait || follow || revoke || stdin) throw new InvalidCommandError();
+      const options = parseOptionalOptions(values, ["--project", "--environment"]);
+      const projectId = options["--project"],
+        environment = options["--environment"];
+      if (
+        !isValue(projectId) ||
+        (environment !== undefined && environment !== "dev" && environment !== "prod")
+      )
+        throw new InvalidCommandError();
+      return {
+        kind: "database-access-list",
+        projectId,
+        ...(environment === undefined ? {} : { environment }),
+        credentialStore,
+      };
+    }
+    if (subcommand === "revoke") {
+      if (!yes || wait || follow || revoke || stdin) throw new InvalidCommandError();
+      const options = parseOptions(values, ["--project", "--access"]);
+      return {
+        kind: "database-access-revoke",
+        projectId: options["--project"],
+        accessId: options["--access"],
+        yes: true,
+        credentialStore,
+      };
+    }
+    throw new InvalidCommandError();
+  }
+  if (first === "database" && values[0] === "watch") {
+    values.shift();
+    const subcommand = values.shift();
+    if (subcommand === "create") {
+      if (!yes || wait || follow || revoke || stdin) throw new InvalidCommandError();
+      const options = parseOptionalOptions(values, [
+        "--project",
+        "--environment",
+        "--table",
+        "--schema",
+        "--columns",
+        "--operations",
+        "--idempotency-key",
+      ]);
+      const projectId = options["--project"],
+        environment = options["--environment"],
+        table = options["--table"],
+        schema = options["--schema"],
+        columns = options["--columns"],
+        operations = options["--operations"],
+        idempotencyKey = options["--idempotency-key"];
+      if (
+        !isValue(projectId) ||
+        !isValue(idempotencyKey) ||
+        !isValue(table) ||
+        !isValue(columns) ||
+        (environment !== "dev" && environment !== "prod")
+      )
+        throw new InvalidCommandError();
+      const request = contractValue(() =>
+        parseDatabaseWatchCreateRequest({
+          schema,
+          table,
+          columns: columns.split(","),
+          ...(operations === undefined ? {} : { operations: operations.split(",") }),
+        }),
+      );
+      return {
+        kind: "database-watch-create",
+        projectId,
+        environment,
+        request,
+        idempotencyKey,
+        yes: true,
+        credentialStore,
+      };
+    }
+    if (subcommand === "list") {
+      if (yes || wait || follow || revoke || stdin) throw new InvalidCommandError();
+      const options = parseOptionalOptions(values, ["--project", "--environment"]);
+      const projectId = options["--project"],
+        environment = options["--environment"] ?? "dev";
+      if (!isValue(projectId) || (environment !== "dev" && environment !== "prod"))
+        throw new InvalidCommandError();
+      return { kind: "database-watch-list", projectId, environment, credentialStore };
+    }
+    if (subcommand === "delete") {
+      if (!yes || wait || follow || revoke || stdin) throw new InvalidCommandError();
+      const options = parseOptionalOptions(values, [
+        "--project",
+        "--environment",
+        "--watch",
+        "--idempotency-key",
+      ]);
+      const projectId = options["--project"],
+        environment = options["--environment"],
+        watchId = options["--watch"],
+        idempotencyKey = options["--idempotency-key"];
+      if (
+        !isValue(projectId) ||
+        !isValue(idempotencyKey) ||
+        (environment !== "dev" && environment !== "prod")
+      )
+        throw new InvalidCommandError();
+      return {
+        kind: "database-watch-delete",
+        projectId,
+        environment,
+        watchId: contractValue(() => parseDatabaseWatchId(watchId)),
+        idempotencyKey,
+        yes: true,
+        credentialStore,
+      };
+    }
+    throw new InvalidCommandError();
+  }
+  if (first === "database" && values[0] === "table") {
+    values.shift();
+    const subcommand = values.shift();
+    if (subcommand === "create") {
+      if (!yes || wait || follow || revoke || stdin) throw new InvalidCommandError();
+      const options = parseOptionalOptions(values, [
+        "--project",
+        "--environment",
+        "--table",
+        "--columns-file",
+        "--primary-key",
+        "--idempotency-key",
+      ]);
+      const projectId = options["--project"],
+        environment = options["--environment"],
+        table = options["--table"],
+        columnsFile = options["--columns-file"],
+        primaryKey = options["--primary-key"],
+        idempotencyKey = options["--idempotency-key"];
+      const keyNames = primaryKey === undefined ? [] : primaryKey.split(",");
+      if (
+        !isValue(projectId) ||
+        !isValue(idempotencyKey) ||
+        !isValue(table) ||
+        !isValue(columnsFile) ||
+        (primaryKey !== undefined && !keyNames.every(isDatabaseTableIdentifier)) ||
+        keyNames.length > DATABASE_TABLE_MAX_PRIMARY_KEY_COLUMNS ||
+        !isDatabaseTableIdentifier(table) ||
+        (environment !== "dev" && environment !== "prod")
+      )
+        throw new InvalidCommandError();
+      return {
+        kind: "database-table-create",
+        projectId,
+        environment,
+        table,
+        columnsFile,
+        primaryKey: keyNames,
+        idempotencyKey,
+        yes: true,
+        credentialStore,
+      };
+    }
+    throw new InvalidCommandError();
+  }
+  if (first === "database" && values[0] === "webhook") {
+    values.shift();
+    const subcommand = values.shift();
+    if (subcommand === "subscription") {
+      const action = values.shift();
+      if (
+        !["activate", "deactivate", "status"].includes(action ?? "") ||
+        wait ||
+        follow ||
+        revoke ||
+        stdin ||
+        yes !== (action !== "status")
+      )
+        throw new InvalidCommandError();
+      const options = parseOptionalOptions(values, [
+        "--project",
+        "--environment",
+        "--subscription",
+        "--generation",
+        "--url",
+        "--event-types",
+        "--headers-file",
+        "--out",
+        "--idempotency-key",
+      ]);
+      const projectId = options["--project"],
+        environment = options["--environment"] ?? (action === "status" ? "dev" : undefined),
+        subscriptionId = options["--subscription"];
+      if (
+        !isValue(projectId) ||
+        !subscriptionId ||
+        !ORGANIZATION_ULID.test(subscriptionId) ||
+        (environment !== "dev" && environment !== "prod")
+      )
+        throw new InvalidCommandError();
+      if (action === "status") {
+        if (
+          (
+            [
+              "--generation",
+              "--url",
+              "--event-types",
+              "--headers-file",
+              "--out",
+              "--idempotency-key",
+            ] as const
+          ).some((key) => options[key] !== undefined)
+        )
+          throw new InvalidCommandError();
+        return {
+          kind: "database-webhook-subscription-status",
+          projectId,
+          environment,
+          subscriptionId,
+          credentialStore,
+        };
+      }
+      const generationText = options["--generation"],
+        idempotencyKey = options["--idempotency-key"];
+      if (
+        !generationText ||
+        !/^[1-9][0-9]*$/u.test(generationText) ||
+        Number(generationText) > 2147483647 ||
+        !isValue(idempotencyKey)
+      )
+        throw new InvalidCommandError();
+      const generation = Number(generationText);
+      if (action === "deactivate") {
+        if (
+          (["--url", "--event-types", "--headers-file", "--out"] as const).some(
+            (key) => options[key] !== undefined,
+          )
+        )
+          throw new InvalidCommandError();
+        return {
+          kind: "database-webhook-subscription-deactivate",
+          projectId,
+          environment,
+          subscriptionId,
+          generation,
+          idempotencyKey,
+          yes: true,
+          credentialStore,
+        };
+      }
+      const url = options["--url"],
+        eventTypes = options["--event-types"],
+        headersFile = options["--headers-file"],
+        outputPath = options["--out"];
+      if (
+        !isValue(url) ||
+        !isValue(eventTypes) ||
+        !isValue(outputPath) ||
+        (headersFile !== undefined && !isValue(headersFile))
+      )
+        throw new InvalidCommandError();
+      const request = contractValue(() =>
+        parseDatabaseWebhookCreateRequest({ url, event_types: eventTypes.split(",") }),
+      );
+      return {
+        kind: "database-webhook-subscription-activate",
+        projectId,
+        environment,
+        subscriptionId,
+        generation,
+        url: request.url,
+        eventTypes: request.event_types,
+        headersFile: headersFile ?? null,
+        outputPath,
+        idempotencyKey,
+        yes: true,
+        credentialStore,
+      };
+    }
+    if (subcommand === "create") {
+      if (!yes || wait || follow || revoke || stdin) throw new InvalidCommandError();
+      const options = parseOptionalOptions(values, [
+        "--project",
+        "--environment",
+        "--url",
+        "--event-types",
+        "--headers-file",
+        "--idempotency-key",
+      ]);
+      const projectId = options["--project"],
+        environment = options["--environment"],
+        url = options["--url"],
+        eventTypes = options["--event-types"],
+        headersFile = options["--headers-file"],
+        idempotencyKey = options["--idempotency-key"];
+      if (
+        !isValue(projectId) ||
+        !isValue(idempotencyKey) ||
+        !isValue(url) ||
+        !isValue(eventTypes) ||
+        (headersFile !== undefined && !isValue(headersFile)) ||
+        (environment !== "dev" && environment !== "prod")
+      )
+        throw new InvalidCommandError();
+      const request = contractValue(() =>
+        parseDatabaseWebhookCreateRequest({ url, event_types: eventTypes.split(",") }),
+      );
+      return {
+        kind: "database-webhook-create",
+        projectId,
+        environment,
+        url: request.url,
+        eventTypes: request.event_types,
+        headersFile: headersFile ?? null,
+        idempotencyKey,
+        yes: true,
+        credentialStore,
+      };
+    }
+    if (subcommand === "list") {
+      if (yes || wait || follow || revoke || stdin) throw new InvalidCommandError();
+      const options = parseOptionalOptions(values, ["--project", "--environment"]);
+      const projectId = options["--project"],
+        environment = options["--environment"] ?? "dev";
+      if (!isValue(projectId) || (environment !== "dev" && environment !== "prod"))
+        throw new InvalidCommandError();
+      return { kind: "database-webhook-list", projectId, environment, credentialStore };
+    }
+    if (subcommand === "get") {
+      if (yes || wait || follow || revoke || stdin) throw new InvalidCommandError();
+      const options = parseOptionalOptions(values, ["--project", "--environment", "--webhook"]);
+      const projectId = options["--project"],
+        environment = options["--environment"] ?? "dev",
+        webhookId = options["--webhook"];
+      if (!isValue(projectId) || (environment !== "dev" && environment !== "prod"))
+        throw new InvalidCommandError();
+      return {
+        kind: "database-webhook-get",
+        projectId,
+        environment,
+        webhookId: contractValue(() => parseDatabaseWebhookId(webhookId)),
+        credentialStore,
+      };
+    }
+    if (subcommand === "delete" || subcommand === "test") {
+      if (!yes || wait || follow || revoke || stdin) throw new InvalidCommandError();
+      const options = parseOptionalOptions(values, [
+        "--project",
+        "--environment",
+        "--webhook",
+        "--idempotency-key",
+      ]);
+      const projectId = options["--project"],
+        environment = options["--environment"],
+        webhookId = options["--webhook"],
+        idempotencyKey = options["--idempotency-key"] ?? null;
+      if (!isValue(projectId)) throw new InvalidCommandError();
+      if (environment !== "dev" && environment !== "prod") throw new InvalidCommandError();
+      const target = contractValue(() => parseDatabaseWebhookId(webhookId));
+      if (subcommand === "delete")
+        return {
+          kind: "database-webhook-delete",
+          projectId,
+          environment,
+          webhookId: target,
+          idempotencyKey,
+          yes: true,
+          credentialStore,
+        };
+      return {
+        kind: "database-webhook-test",
+        projectId,
+        environment,
+        webhookId: target,
+        idempotencyKey,
+        yes: true,
+        credentialStore,
+      };
+    }
+    if (subcommand === "deliveries") {
+      if (yes || wait || follow || revoke || stdin) throw new InvalidCommandError();
+      const options = parseOptionalOptions(values, [
+        "--project",
+        "--environment",
+        "--webhook",
+        "--limit",
+        "--cursor",
+      ]);
+      const projectId = options["--project"],
+        environment = options["--environment"] ?? "dev",
+        webhookId = options["--webhook"],
+        limit = options["--limit"],
+        cursor = options["--cursor"];
+      if (!isValue(projectId) || (environment !== "dev" && environment !== "prod"))
+        throw new InvalidCommandError();
+      return {
+        kind: "database-webhook-deliveries",
+        projectId,
+        environment,
+        webhookId:
+          webhookId === undefined ? null : contractValue(() => parseDatabaseWebhookId(webhookId)),
+        limit:
+          limit === undefined
+            ? null
+            : contractValue(() =>
+                parseDatabaseListLimit(limit, DATABASE_PAGE_MAX_ITEMS, DATABASE_PAGE_MAX_ITEMS),
+              ),
+        cursor: contractValue(() => parseDatabaseCursor(cursor)),
+        credentialStore,
+      };
+    }
+    if (subcommand === "replay") {
+      if (!yes || wait || follow || revoke || stdin) throw new InvalidCommandError();
+      const options = parseOptionalOptions(values, [
+        "--project",
+        "--environment",
+        "--delivery",
+        "--idempotency-key",
+      ]);
+      const projectId = options["--project"],
+        environment = options["--environment"],
+        deliveryId = options["--delivery"];
+      if (!isValue(projectId) || (environment !== "dev" && environment !== "prod"))
+        throw new InvalidCommandError();
+      return {
+        kind: "database-webhook-replay",
+        projectId,
+        environment,
+        deliveryId: contractValue(() => parseDatabaseDeliveryId(deliveryId)),
+        idempotencyKey: options["--idempotency-key"] ?? null,
+        yes: true,
+        credentialStore,
+      };
+    }
+    throw new InvalidCommandError();
+  }
+  if (first === "database" && values[0] === "schedule") {
+    values.shift();
+    const subcommand = values.shift();
+    if (subcommand === "set") {
+      if (!yes || wait || follow || revoke || stdin) throw new InvalidCommandError();
+      const options = parseOptionalOptions(values, [
+        "--project",
+        "--environment",
+        "--name",
+        "--cron",
+        "--every-seconds",
+        "--statements-file",
+        "--timeout-ms",
+        "--enabled",
+      ]);
+      const projectId = options["--project"],
+        environment = options["--environment"],
+        name = options["--name"],
+        cron = options["--cron"],
+        everySeconds = options["--every-seconds"],
+        statementsFile = options["--statements-file"],
+        timeoutMs = options["--timeout-ms"],
+        enabled = options["--enabled"];
+      if (
+        !isValue(projectId) ||
+        !isValue(statementsFile) ||
+        (environment !== "dev" && environment !== "prod") ||
+        (cron === undefined) === (everySeconds === undefined) ||
+        (everySeconds !== undefined && !/^[0-9]{1,9}$/u.test(everySeconds)) ||
+        (timeoutMs !== undefined && !/^[0-9]{1,6}$/u.test(timeoutMs)) ||
+        (enabled !== undefined && enabled !== "true" && enabled !== "false")
+      )
+        throw new InvalidCommandError();
+      return {
+        kind: "database-schedule-set",
+        projectId,
+        environment,
+        name: contractValue(() => parseDatabaseScheduleName(name)),
+        cron: cron ?? null,
+        everySeconds: everySeconds === undefined ? null : Number(everySeconds),
+        statementsFile,
+        timeoutMs: timeoutMs === undefined ? null : Number(timeoutMs),
+        enabled: enabled === undefined ? null : enabled === "true",
+        yes: true,
+        credentialStore,
+      };
+    }
+    if (subcommand === "list") {
+      if (yes || wait || follow || revoke || stdin) throw new InvalidCommandError();
+      const options = parseOptionalOptions(values, ["--project", "--environment"]);
+      const projectId = options["--project"],
+        environment = options["--environment"] ?? "dev";
+      if (!isValue(projectId) || (environment !== "dev" && environment !== "prod"))
+        throw new InvalidCommandError();
+      return { kind: "database-schedule-list", projectId, environment, credentialStore };
+    }
+    if (subcommand === "get" || subcommand === "runs") {
+      if (yes || wait || follow || revoke || stdin) throw new InvalidCommandError();
+      const options = parseOptionalOptions(
+        values,
+        subcommand === "get"
+          ? ["--project", "--environment", "--name"]
+          : ["--project", "--environment", "--name", "--limit"],
+      );
+      const projectId = options["--project"],
+        environment = options["--environment"] ?? "dev",
+        name = options["--name"],
+        limit = options["--limit"];
+      if (!isValue(projectId) || (environment !== "dev" && environment !== "prod"))
+        throw new InvalidCommandError();
+      const scheduleName = contractValue(() => parseDatabaseScheduleName(name));
+      if (subcommand === "get")
+        return {
+          kind: "database-schedule-get",
+          projectId,
+          environment,
+          name: scheduleName,
+          credentialStore,
+        };
+      return {
+        kind: "database-schedule-runs",
+        projectId,
+        environment,
+        name: scheduleName,
+        limit:
+          limit === undefined
+            ? null
+            : contractValue(() =>
+                parseDatabaseListLimit(limit, SCHEDULE_RUNS_MAX_ITEMS, SCHEDULE_RUNS_MAX_ITEMS),
+              ),
+        credentialStore,
+      };
+    }
+    if (subcommand === "delete" || subcommand === "run") {
+      if (!yes || wait || follow || revoke || stdin) throw new InvalidCommandError();
+      const options = parseOptionalOptions(
+        values,
+        subcommand === "run"
+          ? ["--project", "--environment", "--name", "--idempotency-key"]
+          : ["--project", "--environment", "--name"],
+      );
+      const projectId = options["--project"],
+        environment = options["--environment"];
+      if (!isValue(projectId) || (environment !== "dev" && environment !== "prod"))
+        throw new InvalidCommandError();
+      const name = contractValue(() => parseDatabaseScheduleName(options["--name"]));
+      return subcommand === "delete"
+        ? {
+            kind: "database-schedule-delete",
+            projectId,
+            environment,
+            name,
+            yes: true,
+            credentialStore,
+          }
+        : {
+            kind: "database-schedule-run",
+            projectId,
+            environment,
+            name,
+            idempotencyKey: options["--idempotency-key"] ?? null,
+            yes: true,
+            credentialStore,
+          };
+    }
+    throw new InvalidCommandError();
+  }
+  if (first === "database" && values[0] === "executions") {
+    values.shift();
+    if (yes || wait || follow || revoke || stdin) throw new InvalidCommandError();
+    const options = parseOptionalOptions(values, [
+      "--project",
+      "--environment",
+      "--from",
+      "--to",
+      "--granularity",
+      "--limit",
+      "--cursor",
+    ]);
+    const projectId = options["--project"],
+      environment = options["--environment"] ?? "dev",
+      from = options["--from"],
+      to = options["--to"],
+      granularity = options["--granularity"],
+      limit = options["--limit"],
+      cursor = options["--cursor"];
+    if (
+      !isValue(projectId) ||
+      (environment !== "dev" && environment !== "prod") ||
+      !isValue(from) ||
+      !isValue(to) ||
+      (granularity !== "hour" && granularity !== "day")
+    )
+      throw new InvalidCommandError();
+    const window = contractValue(() => parseDatabaseUsageWindow(from, to, granularity));
+    return {
+      kind: "database-executions",
+      projectId,
+      environment,
+      from: window.from,
+      to: window.to,
+      granularity: window.granularity,
+      limit:
+        limit === undefined
+          ? null
+          : contractValue(() =>
+              parseDatabaseListLimit(limit, DATABASE_PAGE_MAX_ITEMS, DATABASE_PAGE_MAX_ITEMS),
+            ),
+      cursor: contractValue(() => parseDatabaseCursor(cursor)),
+      credentialStore,
+    };
+  }
+  if (first === "database" && values[0] === "psql") {
+    values.shift();
+    if (yes || wait || follow || revoke || stdin) throw new InvalidCommandError();
+    const options = parseOptionalOptions(values, ["--project", "--environment", "--mode", "--ttl"]);
+    const projectId = options["--project"],
+      environment = options["--environment"],
+      mode = options["--mode"] ?? "read";
+    if (
+      !isValue(projectId) ||
+      (environment !== "dev" && environment !== "prod") ||
+      (mode !== "read" && mode !== "write")
+    )
+      throw new InvalidCommandError();
+    return {
+      kind: "database-psql",
+      projectId,
+      environment,
+      mode,
+      ttlSeconds: accessTtlSeconds(options["--ttl"]),
+      credentialStore,
+    };
+  }
+  if (first === "database" && values.shift() === "query") {
+    if (yes || wait || follow || stdin) throw new InvalidCommandError();
+    const options = parseOptionalOptions(values, [
+      "--project",
+      "--environment",
+      "--statement",
+      "--parameters-json",
+    ]);
+    const environment = options["--environment"];
+    if (environment !== "dev" && environment !== "prod") throw new InvalidCommandError();
+    const projectId = options["--project"];
+    const statement = options["--statement"];
+    if (
+      !isValue(projectId) ||
+      !isValue(statement) ||
+      !/^(?:select|with)\b/iu.test(statement.trimStart()) ||
+      new TextEncoder().encode(statement).byteLength > 4_096
+    ) {
+      throw new InvalidCommandError();
+    }
+    let parameters: unknown = [];
+    try {
+      parameters = JSON.parse(options["--parameters-json"] ?? "[]") as unknown;
+    } catch {
+      throw new InvalidCommandError();
+    }
+    if (
+      !Array.isArray(parameters) ||
+      parameters.length > 32 ||
+      !parameters.every(
+        (parameter) =>
+          parameter === null ||
+          typeof parameter === "string" ||
+          typeof parameter === "boolean" ||
+          (typeof parameter === "number" && Number.isFinite(parameter)),
+      )
+    ) {
+      throw new InvalidCommandError();
+    }
+    return {
+      kind: "database-query",
+      projectId,
+      environment,
+      statement,
+      parameters: Object.freeze([...parameters]) as readonly (string | number | boolean | null)[],
+      credentialStore,
+    };
+  }
+  if (first === "link") {
+    if (yes || wait || follow || stdin) throw new InvalidCommandError();
+    const options = parseOptions(values, [
+      "--project",
+      "--repository-owner",
+      "--repository-name",
+      "--idempotency-key",
+    ]);
+    return {
+      kind: "link",
+      projectId: options["--project"],
+      repositoryOwner: options["--repository-owner"],
+      repositoryName: options["--repository-name"],
+      idempotencyKey: options["--idempotency-key"],
+      credentialStore,
+    };
+  }
+  if (first === "source" && values.shift() === "auto-deploy") {
+    const subcommand = values.shift();
+    if (subcommand === "set") {
+      if (yes || wait || follow || stdin) throw new InvalidCommandError();
+      const options = parseOptions(values, [
+        "--project",
+        "--branch",
+        "--enabled",
+        "--idempotency-key",
+      ]);
+      if (!validGithubBranchName(options["--branch"])) throw new InvalidCommandError();
+      if (options["--enabled"] !== "true" && options["--enabled"] !== "false")
+        throw new InvalidCommandError();
+      return {
+        kind: "source-auto-deploy-set",
+        projectId: options["--project"],
+        branch: options["--branch"],
+        enabled: options["--enabled"] === "true",
+        idempotencyKey: options["--idempotency-key"],
+        credentialStore,
+      };
+    }
+    if (subcommand === "status") {
+      if (yes || wait || follow || stdin) throw new InvalidCommandError();
+      const options = parseOptions(values, ["--project"]);
+      return {
+        kind: "source-auto-deploy-status",
+        projectId: options["--project"],
+        credentialStore,
+      };
+    }
+    throw new InvalidCommandError();
+  }
+  if (first === "plan") {
+    if (yes || wait || follow || stdin) throw new InvalidCommandError();
+    const options = parseOptionalOptions(values, ["--project", "--commit", "--environment"]);
+    const projectId = options["--project"];
+    const commitSha = options["--commit"];
+    if (projectId === undefined || commitSha === undefined) throw new InvalidCommandError();
+    return {
+      kind: "plan",
+      projectId,
+      commitSha,
+      ...(options["--environment"] === undefined
+        ? {}
+        : { environment: deploymentEnvironment(options["--environment"]) }),
+      credentialStore,
+    };
+  }
+  if (first === "deploy") {
+    if (!yes || follow || stdin) throw new InvalidCommandError();
+    const options = parseOptionalOptions(values, [
+      "--project",
+      "--plan-id",
+      "--commit",
+      "--environment",
+      "--idempotency-key",
+    ]);
+    const projectId = options["--project"];
+    const idempotencyKey = options["--idempotency-key"];
+    const planId = options["--plan-id"] ?? null;
+    const commitSha = options["--commit"] ?? null;
+    // A plan already names its environment, so --environment only accompanies --commit.
+    if (
+      projectId === undefined ||
+      idempotencyKey === undefined ||
+      (planId === null) === (commitSha === null) ||
+      (planId !== null && options["--environment"] !== undefined)
+    )
+      throw new InvalidCommandError();
+    return {
+      kind: "deploy",
+      projectId,
+      planId,
+      commitSha,
+      ...(options["--environment"] === undefined
+        ? {}
+        : { environment: deploymentEnvironment(options["--environment"]) }),
+      idempotencyKey,
+      yes,
+      wait,
+      credentialStore,
+    };
+  }
+  if (first === "logs") {
+    if (!follow || yes || wait || stdin) throw new InvalidCommandError();
+    const operationId = values.shift();
+    if (isValue(operationId) && values.length === 0)
+      return { kind: "logs", operationId, follow, credentialStore };
+  }
+  if (first === "deployment" && values[0] === "logs") {
+    values.shift();
+    // The command reads one page of diagnostics; it never streams, so --follow is refused.
+    if (follow || yes || wait || stdin) throw new InvalidCommandError();
+    const options = parseOptionalOptions(values, ["--project", "--deployment", "--cursor"]);
+    const projectId = options["--project"];
+    const deploymentId = options["--deployment"];
+    const cursor = options["--cursor"];
+    if (
+      projectId === undefined ||
+      deploymentId === undefined ||
+      !ORGANIZATION_ULID.test(projectId) ||
+      !ORGANIZATION_ULID.test(deploymentId) ||
+      (cursor !== undefined && !/^[A-Za-z0-9_-]+$/u.test(cursor))
+    )
+      throw new InvalidCommandError();
+    return {
+      kind: "deployment-logs",
+      projectId,
+      deploymentId,
+      ...(cursor === undefined ? {} : { cursor }),
+      credentialStore,
+    };
+  }
+  if (first === "deployment" && values[0] === "list") {
+    values.shift();
+    if (yes || wait || follow || stdin) throw new InvalidCommandError();
+    const options = parseOptionalOptions(values, ["--project", "--cursor", "--limit"]);
+    const projectId = options["--project"];
+    const cursor = options["--cursor"];
+    const limit = options["--limit"] === undefined ? undefined : decimalLimit(options["--limit"]);
+    if (
+      projectId === undefined ||
+      !ORGANIZATION_ULID.test(projectId) ||
+      (cursor !== undefined && !/^[A-Za-z0-9_-]+$/u.test(cursor)) ||
+      (limit !== undefined && (!Number.isSafeInteger(limit) || limit < 1 || limit > 100))
+    )
+      throw new InvalidCommandError();
+    return {
+      kind: "deployment-list",
+      projectId,
+      ...(cursor === undefined ? {} : { cursor }),
+      ...(limit === undefined ? {} : { limit }),
+      credentialStore,
+    };
+  }
+  if (first === "deployment" && values[0] === "get") {
+    values.shift();
+    if (yes || wait || follow || stdin) throw new InvalidCommandError();
+    const options = parseOptions(values, ["--project", "--deployment"]);
+    if (
+      !ORGANIZATION_ULID.test(options["--project"]) ||
+      !ORGANIZATION_ULID.test(options["--deployment"])
+    )
+      throw new InvalidCommandError();
+    return {
+      kind: "deployment-get",
+      projectId: options["--project"],
+      deploymentId: options["--deployment"],
+      credentialStore,
+    };
+  }
+  if (first === "rollback" && values[0] === "plan") {
+    if (yes || wait || follow || stdin) throw new InvalidCommandError();
+    values.shift();
+    const options = parseOptions(values, ["--project", "--deployment"]);
+    return {
+      kind: "rollback-plan",
+      projectId: options["--project"],
+      deploymentId: options["--deployment"],
+      credentialStore,
+    };
+  }
+  if (first === "rollback") {
+    if (!yes || wait || follow || stdin) throw new InvalidCommandError();
+    const options = parseOptions(values, [
+      "--project",
+      "--deployment",
+      "--if-match",
+      "--confirmation-token",
+      "--idempotency-key",
+    ]);
+    return {
+      kind: "rollback",
+      projectId: options["--project"],
+      deploymentId: options["--deployment"],
+      ifMatch: options["--if-match"],
+      confirmationToken: options["--confirmation-token"],
+      idempotencyKey: options["--idempotency-key"],
+      yes,
+      credentialStore,
+    };
+  }
+  if (first === "deployment" && values[0] === "promote" && values[1] === "plan") {
+    if (yes || wait || follow || stdin) throw new InvalidCommandError();
+    values.splice(0, 2);
+    const options = parseOptions(values, ["--project", "--deployment"]);
+    return {
+      kind: "promotion-plan",
+      projectId: options["--project"],
+      sourceDeploymentId: options["--deployment"],
+      credentialStore,
+    };
+  }
+  if (first === "deployment" && values[0] === "promote") {
+    if (!yes || follow || stdin) throw new InvalidCommandError();
+    values.shift();
+    const options = parseOptions(values, [
+      "--project",
+      "--deployment",
+      "--if-match",
+      "--confirmation-token",
+      "--idempotency-key",
+    ]);
+    return {
+      kind: "promote",
+      projectId: options["--project"],
+      sourceDeploymentId: options["--deployment"],
+      ifMatch: options["--if-match"],
+      confirmationToken: options["--confirmation-token"],
+      idempotencyKey: options["--idempotency-key"],
+      yes,
+      wait,
+      credentialStore,
+    };
+  }
+  if (first === "delete" && values[0] === "plan") {
+    if (yes || wait || follow || stdin) throw new InvalidCommandError();
+    values.shift();
+    const options = parseOptions(values, ["--project"]);
+    return { kind: "delete-plan", projectId: options["--project"], credentialStore };
+  }
+  if (first === "delete") {
+    if (!yes || wait || follow || stdin) throw new InvalidCommandError();
+    const options = parseOptions(values, [
+      "--project",
+      "--if-match",
+      "--confirmation-token",
+      "--idempotency-key",
+    ]);
+    return {
+      kind: "delete",
+      projectId: options["--project"],
+      ifMatch: options["--if-match"],
+      confirmationToken: options["--confirmation-token"],
+      idempotencyKey: options["--idempotency-key"],
+      yes,
+      credentialStore,
+    };
+  }
+  if (first === "export" && values[0] === "create") {
+    if (yes || wait || follow || !stdin) throw new InvalidCommandError();
+    values.shift();
+    const options = parseOptions(values, ["--project", "--idempotency-key"]);
+    return {
+      kind: "export-create",
+      projectId: options["--project"],
+      idempotencyKey: options["--idempotency-key"],
+      stdin,
+      credentialStore,
+    };
+  }
+  if (first === "export" && values[0] === "get") {
+    if (yes || wait || follow || stdin) throw new InvalidCommandError();
+    values.shift();
+    const exportId = values.shift();
+    if (!exportId) throw new InvalidCommandError();
+    const options = parseOptions(values, ["--project"]);
+    return { kind: "export-get", projectId: options["--project"], exportId, credentialStore };
+  }
+  if (first === "export" && values[0] === "download-link") {
+    if (yes || wait || follow || stdin) throw new InvalidCommandError();
+    values.shift();
+    const exportId = values.shift();
+    if (!exportId) throw new InvalidCommandError();
+    const options = parseOptions(values, ["--project"]);
+    return {
+      kind: "export-download-link",
+      projectId: options["--project"],
+      exportId,
+      credentialStore,
+    };
+  }
+  if (first === "secret" && values[0] === "list") {
+    if (yes || wait || follow || stdin) throw new InvalidCommandError();
+    values.shift();
+    const options = parseOptions(values, ["--project", "--environment"]);
+    return {
+      kind: "secret-list",
+      projectId: options["--project"],
+      environmentId: options["--environment"],
+      credentialStore,
+    };
+  }
+  if (first === "function" && values[0] === "runs") {
+    if (yes || wait || follow || stdin) throw new InvalidCommandError();
+    values.shift();
+    // --limit is the only optional option: one to one hundred runs, fifty by default.
+    const limitIndex = values.indexOf("--limit");
+    let limit = 50;
+    if (limitIndex !== -1) {
+      const raw = values[limitIndex + 1];
+      if (typeof raw !== "string" || !/^[1-9][0-9]{0,2}$/u.test(raw) || Number(raw) > 100) {
+        throw new InvalidCommandError();
+      }
+      limit = Number(raw);
+      values.splice(limitIndex, 2);
+    }
+    const options = parseOptions(values, ["--project", "--environment"]);
+    return {
+      kind: "function-runs",
+      projectId: options["--project"],
+      environmentId: options["--environment"],
+      limit,
+      credentialStore,
+    };
+  }
+  if (first === "secret" && values[0] === "set") {
+    if (yes || follow || !stdin) throw new InvalidCommandError();
+    values.shift();
+    const name = values.shift();
+    if (!isUserSecretName(name)) throw new InvalidCommandError();
+    const options = parseOptionalOptions(values, [
+      "--project",
+      "--environment",
+      "--idempotency-key",
+      "--token-user",
+      "--token-organization",
+      "--profile-user",
+      "--profile-organization",
+    ]);
+    const projectId = options["--project"];
+    const environmentId = options["--environment"];
+    const idempotencyKey = options["--idempotency-key"];
+    const environmentToken = handedAccount(
+      options["--token-user"],
+      options["--token-organization"],
+    );
+    const profileAccount = handedAccount(
+      options["--profile-user"],
+      options["--profile-organization"],
+    );
+    // A key form and a saved-login form contradict each other; neither wins.
+    if (
+      projectId === undefined ||
+      environmentId === undefined ||
+      idempotencyKey === undefined ||
+      (environmentToken !== undefined && profileAccount !== undefined)
+    )
+      throw new InvalidCommandError();
+    return {
+      kind: "secret-set",
+      projectId,
+      environmentId,
+      name,
+      idempotencyKey,
+      stdin,
+      wait,
+      ...(environmentToken === undefined ? {} : { environmentToken }),
+      ...(profileAccount === undefined ? {} : { profileAccount }),
+      credentialStore,
+    };
+  }
+  if (first === "secret" && values[0] === "delete") {
+    if (yes || follow || stdin) throw new InvalidCommandError();
+    values.shift();
+    const name = values.shift();
+    if (!isUserSecretName(name, "delete")) throw new InvalidCommandError();
+    const options = parseOptions(values, ["--project", "--environment", "--idempotency-key"]);
+    return {
+      kind: "secret-delete",
+      projectId: options["--project"],
+      environmentId: options["--environment"],
+      name,
+      idempotencyKey: options["--idempotency-key"],
+      wait,
+      credentialStore,
+    };
+  }
+  if (first === "domain" && values[0] === "paid") {
+    const subcommand = values[1];
+    values.splice(0, 2);
+    if (subcommand === "plan") {
+      if (yes || wait || follow || stdin) throw new InvalidCommandError();
+      const options = parseOptions(values, ["--project", "--hostname"]);
+      if (!validPaidHostname(options["--hostname"])) throw new InvalidCommandError();
+      return {
+        kind: "paid-domain-plan",
+        projectId: options["--project"],
+        hostname: options["--hostname"],
+        credentialStore,
+      };
+    }
+    if (subcommand === "status") {
+      if (yes || wait || follow || stdin) throw new InvalidCommandError();
+      const options = parseOptions(values, ["--project"]);
+      return { kind: "paid-domain-status", projectId: options["--project"], credentialStore };
+    }
+    if (subcommand === "apply" || subcommand === "delete") {
+      if (!yes || wait || follow || stdin) throw new InvalidCommandError();
+      const options = parseOptions(values, ["--project", "--hostname", "--idempotency-key"]);
+      if (!validPaidHostname(options["--hostname"])) throw new InvalidCommandError();
+      return {
+        kind: subcommand === "apply" ? "paid-domain-apply" : "paid-domain-delete",
+        projectId: options["--project"],
+        hostname: options["--hostname"],
+        idempotencyKey: options["--idempotency-key"],
+        yes,
+        credentialStore,
+      };
+    }
+    throw new InvalidCommandError();
+  }
+  if (first === "domain" && values[0] === "cloudflare") {
+    const subcommand = values[1];
+    values.splice(0, 2);
+    if (subcommand === "authorize") {
+      if (yes || wait || follow || stdin) throw new InvalidCommandError();
+      const options = parseOptions(values, ["--project", "--zone", "--idempotency-key"]);
+      if (!validPaidHostname(options["--zone"])) throw new InvalidCommandError();
+      return {
+        kind: "domain-cloudflare-authorize",
+        projectId: options["--project"],
+        zone: options["--zone"],
+        idempotencyKey: options["--idempotency-key"],
+        credentialStore,
+      };
+    }
+    if (subcommand === "status") {
+      if (yes || wait || follow || stdin) throw new InvalidCommandError();
+      const options = parseOptions(values, ["--project"]);
+      return {
+        kind: "domain-cloudflare-status",
+        projectId: options["--project"],
+        credentialStore,
+      };
+    }
+    if (subcommand === "apply") {
+      if (!yes || !wait || follow || stdin) throw new InvalidCommandError();
+      const options = parseOptions(values, ["--project", "--idempotency-key"]);
+      return {
+        kind: "domain-cloudflare-apply",
+        projectId: options["--project"],
+        idempotencyKey: options["--idempotency-key"],
+        yes,
+        wait,
+        credentialStore,
+      };
+    }
+    throw new InvalidCommandError();
+  }
+  if (first === "mail" && ["workspace", "binding", "identity"].includes(values[0] ?? "")) {
+    if (wait || follow || stdin) throw new InvalidCommandError();
+    return parseSharedMailCommand(values, yes);
+  }
+  if (first === "mail") {
+    const area = values.shift();
+    const sub =
+      area === "webhook" || area === "messages" || area === "domain" ? values.shift() : undefined;
+    // Only retiring the mail domain and rotating the webhook secret are destructive: each needs --yes.
+    const retiring = area === "domain" && sub === "delete";
+    const rotating = area === "webhook" && sub === "rotate";
+    if (yes !== (retiring || rotating) || wait || follow || stdin) throw new InvalidCommandError();
+    // Rotation takes only its scope and key, so any other option is refused rather than dropped.
+    const options = parseOptionalOptions(
+      values,
+      rotating
+        ? ["--project", "--environment", "--idempotency-key"]
+        : [
+            "--project",
+            "--environment",
+            "--domain",
+            "--sending",
+            "--receiving",
+            "--url",
+            "--idempotency-key",
+            "--message",
+            "--after",
+          ],
+    );
+    const required = (key: keyof typeof options) => {
+      const value = options[key];
+      if (!value) throw new InvalidCommandError();
+      return value;
+    };
+    const scope = { projectId: required("--project"), environmentId: required("--environment") };
+    let request: ManagedMailCommand,
+      label: Extract<ProductCliCommand, { kind: "managed-mail" }>["label"];
+    if (area === "setup" || (area === "domain" && sub === "set")) {
+      // The managed domain always sends: the API accepts only sending true, so any other value is a usage error.
+      const sending = required("--sending"),
+        receiving = required("--receiving");
+      if (sending !== "true" || !["true", "false"].includes(receiving))
+        throw new InvalidCommandError();
+      request = {
+        ...scope,
+        action: "configure",
+        domain: required("--domain"),
+        sending: true,
+        receiving: receiving === "true",
+        idempotencyKey: required("--idempotency-key"),
+      };
+      label = area === "domain" ? "mail domain set" : "mail setup";
+    } else if (area === "status" || (area === "domain" && sub === "status")) {
+      request = { ...scope, action: "status" };
+      label = area === "domain" ? "mail domain status" : "mail status";
+    } else if (retiring) {
+      request = {
+        ...scope,
+        action: "domain_delete",
+        idempotencyKey: required("--idempotency-key"),
+      };
+      label = "mail domain delete";
+    } else if (area === "webhook" && sub === "set") {
+      request = {
+        ...scope,
+        action: "webhook_set",
+        url: required("--url"),
+        idempotencyKey: required("--idempotency-key"),
+      };
+      label = "mail webhook set";
+    } else if (rotating) {
+      request = {
+        ...scope,
+        action: "webhook_rotate",
+        idempotencyKey: required("--idempotency-key"),
+      };
+      label = "mail webhook rotate";
+    } else if (area === "webhook" && (sub === "verify" || sub === "disable")) {
+      request = {
+        ...scope,
+        action: sub === "verify" ? "webhook_verify" : "webhook_disable",
+        idempotencyKey: required("--idempotency-key"),
+      };
+      label = sub === "verify" ? "mail webhook verify" : "mail webhook disable";
+    } else if (area === "messages" && sub === "list") {
+      request = {
+        ...scope,
+        action: "messages_list",
+        ...(options["--after"] ? { after: options["--after"] } : {}),
+      };
+      label = "mail messages list";
+    } else if (area === "messages" && sub === "get") {
+      request = { ...scope, action: "message_get", messageId: required("--message") };
+      label = "mail messages get";
+    } else if (area === "messages" && sub === "retry") {
+      request = {
+        ...scope,
+        action: "message_retry",
+        messageId: required("--message"),
+        idempotencyKey: required("--idempotency-key"),
+      };
+      label = "mail messages retry";
+    } else throw new InvalidCommandError();
+    return { kind: "managed-mail", request, label, credentialStore };
+  }
+  throw new InvalidCommandError();
+};
+
+const removeFlag = (values: Array<string>, flag: string): boolean => {
+  const index = values.indexOf(flag);
+  if (index < 0) return false;
+  if (values.indexOf(flag, index + 1) >= 0) throw new InvalidCommandError();
+  values.splice(index, 1);
+  return true;
+};
+
+const parseOptions = <T extends string>(
+  values: readonly string[],
+  allowed: readonly T[],
+): Record<T, string> => {
+  const result = {} as Record<T, string>;
+  for (let index = 0; index < values.length; index += 2) {
+    const option = values[index];
+    const value = values[index + 1];
+    if (option === undefined || !allowed.includes(option as T) || !isValue(value)) {
+      throw new InvalidCommandError();
+    }
+    if (option === "--idempotency-key" && !IDEMPOTENCY_KEY.test(value))
+      throw new InvalidCommandError();
+    if (option in result) throw new InvalidCommandError();
+    result[option as T] = value;
+  }
+  if (Object.keys(result).length !== allowed.length) throw new InvalidCommandError();
+  return result;
+};
+
+const deploymentEnvironment = (value: string | undefined): "dev" | "prod" => {
+  if (value === undefined || value === "dev") return "dev";
+  if (value === "prod") return "prod";
+  throw new InvalidCommandError();
+};
+
+const parseOptionalOptions = <T extends string>(
+  values: readonly string[],
+  allowed: readonly T[],
+): Partial<Record<T, string>> => {
+  const result: Partial<Record<T, string>> = {};
+  for (let index = 0; index < values.length; index += 2) {
+    const option = values[index];
+    const value = values[index + 1];
+    if (option === undefined || !allowed.includes(option as T) || !isValue(value)) {
+      throw new InvalidCommandError();
+    }
+    if (option === "--idempotency-key" && !IDEMPOTENCY_KEY.test(value))
+      throw new InvalidCommandError();
+    if (option in result) throw new InvalidCommandError();
+    result[option as T] = value;
+  }
+  return result;
+};
+
+/** A credential lifetime is minutes, hours or plain seconds, always within 5 minutes and 24 hours. */
+const accessTtlSeconds = (value: string | undefined): number => {
+  if (value === undefined) return 3_600;
+  const match = /^(\d{1,6})(m|h)?$/u.exec(value);
+  if (!match) throw new InvalidCommandError();
+  const amount = Number(match[1]);
+  const seconds = match[2] === "m" ? amount * 60 : match[2] === "h" ? amount * 3_600 : amount;
+  if (!Number.isSafeInteger(seconds) || seconds < 300 || seconds > 86_400)
+    throw new InvalidCommandError();
+  return seconds;
+};
+
+/** A platform organization identifier as the API returns it. */
+const ORGANIZATION_ULID = /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/u;
+/** The Idempotency-Key set that IdempotencyKeyToken documents (letters, digits and . _ : -, 1 to 128 characters); the CLI refuses any other key before a request is sent. */
+const IDEMPOTENCY_KEY = /^[A-Za-z0-9._:-]{1,128}$/u;
+/** A --limit written as a decimal integer: no sign, prefix, exponent or leading zero. Anything else is NaN, which fails the range check. */
+const decimalLimit = (value: string): number =>
+  /^(?:0|[1-9][0-9]*)$/u.test(value) ? Number(value) : Number.NaN;
+
+/** The account a command handed to a terminal must run as; never a credential. */
+export interface HandedAccount {
+  readonly userId: string;
+  readonly organizationId: string;
+}
+
+/**
+ * A user and an organization named together, or neither. A pasted key is refused here, before any
+ * message could repeat it.
+ */
+const handedAccount = (
+  userId: string | undefined,
+  organizationId: string | undefined,
+): HandedAccount | undefined => {
+  if (userId === undefined && organizationId === undefined) return undefined;
+  if (
+    userId === undefined ||
+    organizationId === undefined ||
+    !isProfileUserId(userId) ||
+    WORKOS_USER_API_KEY_PATTERN.test(userId) ||
+    !ORGANIZATION_ULID.test(organizationId)
+  )
+    throw new InvalidCommandError();
+  return { userId, organizationId };
+};
+
+const isValue = (value: string | undefined): value is string =>
+  value !== undefined && value.length > 0 && !value.startsWith("--");
+
+/** A value the contract refuses, or one that is missing, is an invalid command. */
+const contractValue = <T>(parse: () => T): T => {
+  try {
+    return parse();
+  } catch {
+    throw new InvalidCommandError();
+  }
+};
+
+const validGithubBranchName = (value: string): boolean =>
+  !(
+    value.length < 1 ||
+    value.length > 1_024 ||
+    !/^[A-Za-z0-9]/u.test(value) ||
+    value.startsWith("-") ||
+    value.startsWith("/") ||
+    value.endsWith("/") ||
+    value.endsWith(".") ||
+    value.includes("//") ||
+    value.includes("..") ||
+    value.includes("@{") ||
+    [...value].some((character) => {
+      const code = character.codePointAt(0) ?? 0;
+      return code <= 0x20 || code === 0x7f || "\\~^:?*[]".includes(character);
+    }) ||
+    value.split("/").some((component) => component.startsWith(".") || component.endsWith(".lock"))
+  );
+
+const validPaidHostname = (value: string): boolean =>
+  /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/u.test(value) &&
+  !value.endsWith(".poc.aixyte.com") &&
+  value !== "omh.st" &&
+  !value.endsWith(".omh.st") &&
+  value !== "ohmyho.st" &&
+  !value.endsWith(".ohmyho.st");
+
+const SHARED_MAIL_LABELS: readonly SharedMailCommandLabel[] = [
+  "mail workspace list",
+  "mail workspace create",
+  "mail workspace status",
+  "mail workspace retire",
+  "mail workspace dns-authorize",
+  "mail workspace dns-status",
+  "mail workspace dns-revoke",
+  "mail binding get",
+  "mail binding set",
+  "mail binding detach",
+  "mail identity get",
+  "mail identity declare",
+  "mail identity verify",
+  "mail identity revoke",
+  "mail identity authorize",
+  "mail identity authorization-status",
+  "mail identity authorization-revoke",
+];
+
+/** New workspace sender operations stay separate from the exact legacy project mail contract. */
+function parseSharedMailCommand(values: string[], yes: boolean): ProductCliCommand {
+  const area = values.shift(),
+    operation = values.shift();
+  const label = `mail ${area} ${operation}` as SharedMailCommandLabel;
+  if (!SHARED_MAIL_LABELS.includes(label)) throw new InvalidCommandError();
+  const destructive =
+    operation === "retire" ||
+    operation === "detach" ||
+    operation === "revoke" ||
+    operation === "dns-revoke" ||
+    operation === "authorization-revoke";
+  if (yes !== destructive) throw new InvalidCommandError();
+  const allowed = area === "workspace" ? ["--organization"] : ["--project"];
+  const writing = [
+    "create",
+    "retire",
+    "dns-authorize",
+    "dns-revoke",
+    "set",
+    "detach",
+    "declare",
+    "verify",
+    "revoke",
+    "authorize",
+    "authorization-revoke",
+  ].includes(operation ?? "");
+  if (area === "workspace" && operation !== "list" && operation !== "create")
+    allowed.push("--mail-domain");
+  if (area === "binding") allowed.push("--environment");
+  if (operation === "create") allowed.push("--domain", "--sending");
+  if (area === "binding" && operation === "set")
+    allowed.push(
+      "--mail-domain",
+      "--sending",
+      "--sender-addresses",
+      "--default-from",
+      "--reply-to",
+    );
+  if (operation === "declare") allowed.push("--hostname");
+  if (operation === "authorize" || operation === "dns-authorize") allowed.push("--zone");
+  if (writing) allowed.push("--idempotency-key");
+  if (writing && operation !== "create" && operation !== "declare")
+    allowed.push("--expected-revision");
+  const options = parseOptionalOptions(values, allowed);
+  const required = (key: keyof typeof options) => {
+    const value = options[key];
+    if (!value) throw new InvalidCommandError();
+    return value;
+  };
+  const revision = () => {
+    const value = required("--expected-revision");
+    if (!/^(?:0|[1-9][0-9]*)$/u.test(value) || !Number.isSafeInteger(Number(value)))
+      throw new InvalidCommandError();
+    return Number(value);
+  };
+  const sending = () => {
+    const value = required("--sending");
+    if (value !== "true" && value !== "false") throw new InvalidCommandError();
+    return value === "true";
+  };
+  const idempotencyKey = () => required("--idempotency-key");
+  let request: SharedMailCommand;
+  if (area === "workspace") {
+    const scope = { organizationId: required("--organization") };
+    if (operation === "list") request = { ...scope, action: "domains_list" };
+    else if (operation === "create") {
+      const enabled = sending();
+      if (!enabled) throw new InvalidCommandError();
+      request = {
+        ...scope,
+        action: "domain_create",
+        domain: required("--domain"),
+        sending: enabled,
+        idempotencyKey: idempotencyKey(),
+      };
+    } else {
+      const target = { ...scope, mailDomainId: required("--mail-domain") };
+      if (operation === "status") request = { ...target, action: "domain_get" };
+      else if (operation === "dns-status") request = { ...target, action: "domain_dns_status" };
+      else if (operation === "dns-revoke")
+        request = {
+          ...target,
+          action: "domain_dns_revoke",
+          expectedRevision: revision(),
+          idempotencyKey: idempotencyKey(),
+        };
+      else if (operation === "retire")
+        request = {
+          ...target,
+          action: "domain_retire",
+          expectedRevision: revision(),
+          idempotencyKey: idempotencyKey(),
+        };
+      else
+        request = {
+          ...target,
+          action: "domain_dns_authorize",
+          expectedRevision: revision(),
+          zone: required("--zone"),
+          idempotencyKey: idempotencyKey(),
+        };
+    }
+  } else if (area === "binding") {
+    const scope = { projectId: required("--project"), environmentId: required("--environment") };
+    if (operation === "get") request = { ...scope, action: "binding_get" };
+    else if (operation === "detach")
+      request = {
+        ...scope,
+        action: "binding_detach",
+        expectedRevision: revision(),
+        idempotencyKey: idempotencyKey(),
+      };
+    else {
+      const senderAddresses = required("--sender-addresses").split(",");
+      if (
+        senderAddresses.length > 32 ||
+        senderAddresses.some((address) => !address || address.trim() !== address) ||
+        new Set(senderAddresses).size !== senderAddresses.length
+      )
+        throw new InvalidCommandError();
+      request = {
+        ...scope,
+        action: "binding_set",
+        mailDomainId: required("--mail-domain"),
+        sending: sending(),
+        senderAddresses,
+        defaultFrom: required("--default-from"),
+        defaultReplyTo: options["--reply-to"] ?? null,
+        expectedRevision: revision(),
+        idempotencyKey: idempotencyKey(),
+      };
+    }
+  } else {
+    const scope = { projectId: required("--project") };
+    if (operation === "get") request = { ...scope, action: "identity_get" };
+    else if (operation === "authorization-status")
+      request = { ...scope, action: "identity_authorization_status" };
+    else if (operation === "authorization-revoke")
+      request = {
+        ...scope,
+        action: "identity_authorization_revoke",
+        expectedRevision: revision(),
+        idempotencyKey: idempotencyKey(),
+      };
+    else if (operation === "declare")
+      request = {
+        ...scope,
+        action: "identity_declare",
+        hostname: required("--hostname"),
+        idempotencyKey: idempotencyKey(),
+      };
+    else if (operation === "authorize")
+      request = {
+        ...scope,
+        action: "identity_authorize",
+        zone: required("--zone"),
+        expectedRevision: revision(),
+        idempotencyKey: idempotencyKey(),
+      };
+    else
+      request = {
+        ...scope,
+        action: operation === "verify" ? "identity_verify" : "identity_revoke",
+        expectedRevision: revision(),
+        idempotencyKey: idempotencyKey(),
+      };
+  }
+  return { kind: "shared-mail", request, label, credentialStore: "native" };
+}

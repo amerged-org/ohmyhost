@@ -1,0 +1,92 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-neon-management",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-08-21",
+  // Control runs on the Core (D1) through the private control-store bindings; the environment profiles bind the real Workers.
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": false },
+  "services": [
+    {
+      "binding": "NATIVE_AUTH_RESTORE_PREPARATION_RUNTIME",
+      "service": "ohmyho-control-store-disabled",
+      "entrypoint": "NativeAuthRestorePreparationRuntime",
+    },
+    {
+      "binding": "PREVIEW_NATIVE_PREPARATION_RUNTIME",
+      "service": "ohmyho-control-store-disabled",
+      "entrypoint": "PreviewNativePreparationRuntime",
+    },
+    {
+      "binding": "NATIVE_AUTH_RESOURCE_RUNTIME",
+      "service": "ohmyho-control-store-disabled",
+      "entrypoint": "NativeAuthResourceRuntime",
+    },
+    {
+      "binding": "NATIVE_AUTH_DELETION_RUNTIME",
+      "service": "ohmyho-control-store-disabled",
+      "entrypoint": "NativeAuthDeletionRuntime",
+    },
+    {
+      "binding": "NATIVE_AUTH_REGISTRY_AUTHORITY",
+      "service": "ohmyho-control-store-disabled",
+      "entrypoint": "NativeAuthRegistryAuthorityRuntime",
+    },
+    {
+      "binding": "NATIVE_AUTH_REGISTRY_US",
+      "service": "ohmyho-native-auth-development-us",
+      "entrypoint": "NativeRegistryAdminService",
+    },
+    {
+      "binding": "NATIVE_AUTH_REGISTRY_EU",
+      "service": "ohmyho-native-auth-development-eu",
+      "entrypoint": "NativeRegistryAdminService",
+    },
+    {
+      "binding": "NATIVE_PREVIEW_POLICY_US",
+      "service": "ohmyho-native-auth-development-us",
+      "entrypoint": "NativeProductPreviewPolicyService",
+    },
+    {
+      "binding": "NATIVE_PREVIEW_POLICY_EU",
+      "service": "ohmyho-native-auth-development-eu",
+      "entrypoint": "NativeProductPreviewPolicyService",
+    },
+    {
+      "binding": "NATIVE_AUTH_ADMIN_US",
+      "service": "ohmyho-native-auth-development-us",
+      "entrypoint": "NativePolicyService",
+    },
+    {
+      "binding": "NATIVE_AUTH_ADMIN_EU",
+      "service": "ohmyho-native-auth-development-eu",
+      "entrypoint": "NativePolicyService",
+    },
+    {
+      "binding": "DATABASE_MANAGEMENT_RUNTIME",
+      "service": "ohmyho-control-store-disabled",
+      "entrypoint": "DatabaseManagementRuntime",
+    },
+    {
+      "binding": "DATABASE_PRODUCT_RUNTIME",
+      "service": "ohmyho-control-store-disabled",
+      "entrypoint": "DatabaseProductRuntime",
+    },
+    {
+      "binding": "PROJECT_DATABASE_ADMIN_US",
+      "service": "ohmyho-project-database-sandbox-us",
+      "entrypoint": "ProjectDatabaseAdmin",
+    },
+    {
+      "binding": "PROJECT_DATABASE_ADMIN_EU",
+      "service": "ohmyho-project-database-sandbox-eu",
+      "entrypoint": "ProjectDatabaseAdmin",
+    },
+  ],
+  "vars": {
+    "RUNTIME_CONFIGURATION_STATE": "disabled",
+  },
+  // PGCF_API_URL, PGCF_APPS_PROJECT_ID and PGCF_APPS_API_KEY are Worker secrets.
+}

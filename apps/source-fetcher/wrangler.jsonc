@@ -1,0 +1,40 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ohmyho-source-fetcher-disabled",
+  "account_id": "00000000000000000000000000000000",
+  "main": "src/worker-main.ts",
+  "compatibility_date": "2026-08-19",
+  "workers_dev": false,
+  "preview_urls": false,
+  "vars": {
+    "BUILD_OBJECTS_BUCKET_US": "ohmyho-builds-development",
+    "BUILD_OBJECTS_BUCKET_EU": "ohmyho-builds-development-eu",
+    "GITHUB_APP_CLIENT_ID": "disabled",
+    "GITHUB_APP_SLUG": "disabled",
+    "GITHUB_OAUTH_REDIRECT_URI": "https://dev.app.ohmyho.st/v1/github/oauth/callback",
+    "GITHUB_USER_AGENT": "ohmyho-source-fetcher/disabled",
+    "SOURCE_ARCHIVE_MAX_BYTES": "25000000",
+    "SOURCE_FETCH_TIMEOUT_MS": "30000",
+    "PROVIDER_REQUEST_TIMEOUT_MS": "10000",
+    "BINDING_REQUEST_TIMEOUT_MS": "10000",
+  },
+  "services": [
+    {
+      "binding": "BUILD_RUNNER",
+      "service": "ohmyho-build-runner-disabled",
+      "entrypoint": "BuildRunnerService",
+    },
+  ],
+  // GITHUB_APP_PRIVATE_KEY_BASE64 is a Worker secret containing PKCS#8 DER in base64.
+  // GITHUB_APP_CLIENT_SECRET is a separate Worker secret for customer consent.
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": true,
+      "persist": true,
+    },
+  },
+}

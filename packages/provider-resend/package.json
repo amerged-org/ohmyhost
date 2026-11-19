@@ -1,0 +1,24 @@
+{
+  "name": "@ohmyhost/provider-resend",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./webhooks": {
+      "source": "./src/webhooks.ts",
+      "types": "./dist/webhooks.d.ts",
+      "import": "./dist/webhooks.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo",
+    "test": "vitest run --root ../.. packages/provider-resend/src"
+  },
+  "dependencies": {}
+}

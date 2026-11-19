@@ -1,0 +1,50 @@
+{
+  "name": "@ohmyhost/wfp-management",
+  "version": "0.0.0",
+  "private": true,
+  "ohmyhost": {
+    "deployment": "production",
+    "fakeProviderBoundary": {
+      "typescriptProject": "tsconfig.build.json",
+      "artifactRoot": "dist",
+      "entrypoints": [
+        "src/index.ts",
+        "src/worker-main.ts"
+      ],
+      "bundles": [
+        {
+          "entrypoint": "src/worker-main.ts",
+          "metafile": "dist/worker-bundle/metafile.json"
+        }
+      ]
+    }
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json && wrangler deploy --dry-run --outdir dist/worker-bundle --metafile dist/worker-bundle/metafile.json --config wrangler.jsonc",
+    "coverage": "vitest run --root ../.. apps/wfp-management/test --coverage --coverage.include='apps/wfp-management/src/**/*.ts' --coverage.reporter=text --coverage.reporter=json-summary",
+    "deploy:dry-run": "wrangler deploy --dry-run --outdir .wrangler/dry-run",
+    "deploy:sandbox:dry-run": "wrangler deploy --dry-run --config wrangler.sandbox.jsonc --outdir .wrangler/sandbox-dry-run",
+    "deploy:sandbox:preflight": "node scripts/sandbox-preflight.mjs",
+    "test": "vitest run --root ../.. apps/wfp-management/test",
+    "typecheck": "tsc --project tsconfig.json --noEmit --incremental --tsBuildInfoFile typecheck.tsbuildinfo"
+  },
+  "dependencies": {
+    "@ohmyhost/contracts": "workspace:*",
+    "@ohmyhost/build-broker": "workspace:*",
+    "@ohmyhost/dev-access-tokens": "workspace:*",
+    "@ohmyhost/provider-cloudflare": "workspace:*",
+    "@ohmyhost/project-database-runtime": "workspace:*",
+    "@ohmyhost/platform": "workspace:*"
+  },
+  "devDependencies": {
+    "wrangler": "4.125.0"
+  }
+}
