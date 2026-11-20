@@ -1600,10 +1600,10 @@
       "path": ".github/workflows/ci.yml",
       "category": "configuration",
       "document": "docs/development.md#implementation-and-verification",
-      "sha256": "3ea4d0973bad89a306588587ad128ae6b9a2f018359c98ed19adb67e89ccb732",
-      "summary": "Verify an initial public root without archive or privileged runner inputs.",
-      "reviewer": "Local export review",
-      "reviewMethod": "Inspected source changes and applicable focused verification",
+      "sha256": "0a4764e6ec9037f9aa922504be008961a9ce95b7fa3159943ef8a9101a990f66",
+      "summary": "The public GitHub-hosted workflow validates every required job and its typecheck step uses a valid workflow schema.",
+      "reviewer": "W39 public export review",
+      "reviewMethod": "Inspected the exact workflow change and validated the GitHub Actions schema",
       "reviewState": "reviewed"
     },
     {

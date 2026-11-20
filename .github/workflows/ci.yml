@@ -141,7 +141,6 @@ jobs:
           restore-keys: |
             tsc-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.compiler.outputs.versions }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig*.json', 'apps/*/tsconfig*.json', 'packages/*/tsconfig*.json') }}-
       - name: Typecheck the workspace
-        env:
         run: pnpm typecheck
       - name: Save the TypeScript build information
         if: ${{ steps.tsc.outputs.cache-hit != 'true' }}
